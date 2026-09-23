@@ -1,0 +1,156 @@
+.button {
+  display: grid;
+  grid-template-columns: 64px 16px minmax(0, 1fr) auto;
+  column-gap: 10px;
+  align-items: start;
+  width: 100%;
+  padding: 6px 0;
+  border-radius: var(--r-sm);
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.button:hover:not(:disabled) {
+  background-color: var(--bg-hover);
+}
+
+.time {
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+.icon {
+  margin-top: 3px;
+  color: var(--text-2);
+}
+
+.content {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.toolName {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  color: var(--text-2);
+}
+
+.summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--text-1);
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  align-self: start;
+}
+
+.statusText {
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+.statusFailed {
+  font-size: var(--fs-12);
+  color: var(--st-failed);
+}
+
+.iconDone {
+  color: var(--st-done);
+}
+
+.iconFailed {
+  color: var(--st-failed);
+}
+
+.spin {
+  color: var(--st-running);
+  animation: fs-spin 1.2s linear infinite;
+}
+
+.reducedDot {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    display: none;
+  }
+
+  .reducedDot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--st-running);
+  }
+}
+
+.panel {
+  display: grid;
+  grid-template-columns: 64px 16px minmax(0, 1fr) auto;
+  column-gap: 10px;
+  padding-bottom: 6px;
+}
+
+.panelInner {
+  grid-column: 3 / -1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.label {
+  margin: 0 0 4px;
+  font-size: var(--fs-11);
+  color: var(--text-3);
+}
+
+.codeBlock {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  color: var(--text-2);
+  background-color: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 8px 10px;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.codeBlock[data-failed="true"] {
+  border-left: 2px solid var(--st-failed);
+}
+
+@media (max-width: 1023px) {
+  .button,
+  .panel {
+    grid-template-columns: 56px 16px minmax(0, 1fr);
+  }
+
+  .right {
+    grid-column: 3;
+    grid-row: 2;
+    margin-top: 2px;
+    justify-self: start;
+  }
+
+  .panelInner {
+    grid-column: 3 / -1;
+  }
+}

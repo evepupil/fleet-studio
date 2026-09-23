@@ -1,7 +1,13 @@
-/* 176px / 208px / 10px 是页面层规格写死的布局尺寸（design/工作区.md R3 第 2 节），不是令牌。 */
+/*
+ * 176px / 208px / 10px 是页面层规格写死的布局尺寸（design/工作区.md R3 第 2 节），不是令牌。
+ * 第 2 列宽度用 --meter-width（CapacityStrip 按全部池算出、挂在祖先元素上），
+ * 不用 1fr：1fr 会把列拉伸铺满剩余空间，导致数字列被推到页面最右、和计量条之间空一大截。
+ * justify-content: start 让三列整体贴左，多出来的空间留在第 3 列右边，不撑开列间距。
+ */
 .root {
   display: grid;
-  grid-template-columns: 176px minmax(0, 1fr) 208px;
+  grid-template-columns: 176px minmax(0, var(--meter-width, 280px)) 208px;
+  justify-content: start;
   column-gap: var(--sp-5);
   padding-block: 10px;
   align-items: start;

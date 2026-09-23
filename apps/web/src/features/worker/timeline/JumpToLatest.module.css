@@ -1,0 +1,25 @@
+.root {
+  align-self: flex-end;
+  position: sticky;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 28px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-md);
+  background-color: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  transition: filter var(--dur-fast) var(--ease);
+}
+
+.root:hover {
+  filter: brightness(1.08);
+}
+
+.root:active {
+  filter: brightness(0.95);
+}

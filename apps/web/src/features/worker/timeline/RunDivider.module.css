@@ -1,0 +1,58 @@
+.root {
+  margin: var(--sp-3) 0;
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: none;
+  font-size: var(--fs-12);
+  font-weight: var(--fw-medium);
+  color: var(--text-2);
+}
+
+.rule {
+  flex: 1;
+  height: 1px;
+  background-color: var(--line);
+}
+
+.quote {
+  margin-top: var(--sp-2);
+  padding: 8px 12px;
+  border-left: 2px solid var(--line-strong);
+  background-color: var(--bg-raised);
+}
+
+.quoteText {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--text-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.quoteText[data-expanded="false"] {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.toggle {
+  display: inline-block;
+  margin-top: var(--sp-1);
+  font-size: var(--fs-12);
+  color: var(--accent);
+}
+
+.toggle:hover {
+  text-decoration: underline;
+}
