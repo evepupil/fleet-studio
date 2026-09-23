@@ -63,6 +63,12 @@ export interface TraceEntry {
   readonly runtime: "pi" | "opencode";
   readonly cwd: string;
   readonly args: readonly string[] | null;
+  /**
+   * 假苦工进程自己独一份的编号（进程号 + 启动毫秒 + 随机后缀），同一个进程的 start、end
+   * 两行共用同一个值。进程号会被系统重复分配，maxConcurrency 靠这个字段而不是进程号
+   * 去认「这是同一个进程」；读到没有这个字段的旧格式轨迹行时为 null。
+   */
+  readonly traceId: string | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -139,6 +145,7 @@ function parseTraceLine(line: string): TraceEntry | null {
     runtime,
     cwd: readString(parsed, "cwd") ?? "",
     args: readStringArray(parsed, "args") ?? null,
+    traceId: readString(parsed, "traceId") ?? null,
   };
 }
 
@@ -158,31 +165,73 @@ export function readTrace(file: string): TraceEntry[] {
   return entries;
 }
 
+type Delta = { time: number; delta: number };
+
+/**
+ * 有轨迹编号的行：同一个编号只属于同一个进程的一次生命周期，按编号精确配对，
+ * 完全不看进程号——进程号被复用给别的进程也不会互相干扰。
+ */
+function deltasByTraceId(entries: readonly TraceEntry[]): Delta[] {
+  const endAtByTraceId = new Map<string, number>();
+  for (const entry of entries) {
+    if (entry.event === "end" && entry.traceId !== null) {
+      endAtByTraceId.set(entry.traceId, entry.at);
+    }
+  }
+  const deltas: Delta[] = [];
+  for (const entry of entries) {
+    if (entry.event !== "start" || entry.traceId === null) {
+      continue;
+    }
+    deltas.push({ time: entry.at, delta: 1 });
+    const endAt = endAtByTraceId.get(entry.traceId);
+    if (endAt !== undefined) {
+      deltas.push({ time: endAt, delta: -1 });
+    }
+  }
+  return deltas;
+}
+
+/**
+ * 没有轨迹编号的旧格式行：退回按进程号配对，但要按时间顺序处理——同一个进程号出现
+ * 新的 start 时，把前一个还没配上 end 的 start 视为已经在这一刻结束（进程号能被系统
+ * 复用，说明前一个进程必然已经不在了），结束时间取新 start 的时间，不是漏配对。
+ */
+function deltasByPidFallback(entries: readonly TraceEntry[]): Delta[] {
+  const sorted = [...entries].sort((a, b) => a.at - b.at);
+  const openStartAtByPid = new Map<number, number>();
+  const deltas: Delta[] = [];
+  for (const entry of sorted) {
+    if (entry.event === "start") {
+      if (openStartAtByPid.has(entry.pid)) {
+        deltas.push({ time: entry.at, delta: -1 });
+      }
+      deltas.push({ time: entry.at, delta: 1 });
+      openStartAtByPid.set(entry.pid, entry.at);
+    } else if (openStartAtByPid.has(entry.pid)) {
+      deltas.push({ time: entry.at, delta: -1 });
+      openStartAtByPid.delete(entry.pid);
+    }
+  }
+  return deltas;
+}
+
 /**
  * 按 start / end 的时间算出同时在跑的最大进程数。没有匹配到 end 的 start 视为
  * “一直在跑”，只贡献 +1、不配对应的 -1。时间相同时让 end 先结算、start 再生效
  * （半开区间语义：一个进程在它结束的那一刻已经不占名额），这样首尾相接的两次
  * 运行不会被误判成并发。
+ *
+ * Windows 会重复分配进程号（实测：8 路并行起 300 个短命进程，26 次拿到用过的号），
+ * 单靠进程号配对会把前一个进程的结束时间和后一个的搭在一起，凭空多算出一段“还在跑”。
+ * 带轨迹编号的行按编号精确配对，不受进程号复用影响；没有编号的旧格式行才退回按
+ * 进程号配对（见 deltasByPidFallback）。两类行各自配对完再合到一起算峰值。
  */
 export function maxConcurrency(entries: readonly TraceEntry[]): number {
-  const endAtByPid = new Map<number, number>();
-  for (const entry of entries) {
-    if (entry.event === "end") {
-      endAtByPid.set(entry.pid, entry.at);
-    }
-  }
+  const withTraceId = entries.filter((entry) => entry.traceId !== null);
+  const withoutTraceId = entries.filter((entry) => entry.traceId === null);
 
-  const deltas: Array<{ time: number; delta: number }> = [];
-  for (const entry of entries) {
-    if (entry.event !== "start") {
-      continue;
-    }
-    deltas.push({ time: entry.at, delta: 1 });
-    const endAt = endAtByPid.get(entry.pid);
-    if (endAt !== undefined) {
-      deltas.push({ time: endAt, delta: -1 });
-    }
-  }
+  const deltas: Delta[] = [...deltasByTraceId(withTraceId), ...deltasByPidFallback(withoutTraceId)];
   deltas.sort((a, b) => (a.time !== b.time ? a.time - b.time : a.delta - b.delta));
 
   let current = 0;

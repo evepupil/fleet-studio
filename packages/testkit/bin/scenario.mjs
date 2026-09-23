@@ -116,6 +116,16 @@ function traceFile() {
   return typeof file === "string" && file.length > 0 ? file : null;
 }
 
+/**
+ * 每个假苦工进程自己独一份的轨迹编号：进程号会被 Windows 重复分配（实测：8 路并行起
+ * 300 个短命进程，26 次拿到用过的号；全仓并行跑时机器每秒起几十个进程，同一个号在一两秒
+ * 内被后一个苦工拿到并不罕见）。这个编号只在当前进程的一整个生命周期里固定不变，
+ * start、end 两行都带上它，读轨迹的一方（maxConcurrency）就能把「同一个进程号先后
+ * 属于两个不同进程」这种情况分清楚，不会把前一个进程的结束时间和后一个的搭在一起。
+ * 用 pid + 启动毫秒 + 随机后缀拼，randomSuffix 定义在下面，函数声明会被提升，这里能直接用。
+ */
+const TRACE_ID = `${process.pid}-${Date.now()}-${randomSuffix()}`;
+
 function appendTraceLine(record) {
   const file = traceFile();
   if (file === null) {
@@ -143,6 +153,7 @@ export function traceStart(runtime, args) {
     runtime,
     args,
     cwd: process.cwd(),
+    traceId: TRACE_ID,
   });
 }
 
@@ -158,6 +169,7 @@ export function traceEnd(runtime) {
     at: Date.now(),
     runtime,
     cwd: process.cwd(),
+    traceId: TRACE_ID,
   });
 }
 

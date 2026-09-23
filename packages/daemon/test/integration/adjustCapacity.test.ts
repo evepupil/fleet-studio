@@ -18,11 +18,13 @@ describe("调整容量：PATCH 后立即多放行（规格第 10 条）", () => 
 
   beforeEach(async () => {
     harness = await startHarness({ capacity: 1 });
-  });
+  }, 20000);
 
+  // 全仓并行跑测试时 harness.stop() 要多花时间做假苦工进程的收尾，比 vitest 默认的
+  // 10 秒钩子超时更容易超支，显式调宽。
   afterEach(async () => {
     await harness.stop();
-  });
+  }, 30000);
 
   it("容量 1 时派 3 个 hang，改容量为 3 后 3 个都在跑，配置文件里的容量也变成 3", async () => {
     for (let i = 0; i < 3; i += 1) {

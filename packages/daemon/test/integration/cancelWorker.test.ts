@@ -9,18 +9,20 @@ import { type Harness, startHarness } from "./support/harness.js";
 import { waitFor } from "./support/poll.js";
 import { requireDefined } from "./support/require.js";
 import { waitForTraceStarts } from "./support/trace.js";
-import { isPidAlive } from "./support/winProcess.js";
+import { isPidAlive, waitForPidGone } from "./support/winProcess.js";
 
 describe("取消：排队中立即取消，工作中取消后进程结束（规格第 7 条）", () => {
   let harness: Harness;
 
   beforeEach(async () => {
     harness = await startHarness({ capacity: 1 });
-  });
+  }, 20000);
 
+  // 全仓并行跑测试时 harness.stop() 要多花时间做假苦工进程的收尾，比 vitest 默认的
+  // 10 秒钩子超时更容易超支，显式调宽。
   afterEach(async () => {
     await harness.stop();
-  });
+  }, 30000);
 
   it("排队中的苦工取消后立即是已取消", async () => {
     const first = await submitWorker(harness, {
@@ -68,7 +70,10 @@ describe("取消：排队中立即取消，工作中取消后进程结束（规�
     const result = await cancelWorker(harness, workerId);
     expect(result.body.worker.status).toBe("cancelled");
 
-    await waitFor(async () => !(await isPidAlive(pid)), 3000, 100);
-    expect(await isPidAlive(pid)).toBe(false);
+    // 轮询直到进程彻底从进程列表里消失，不做「等完再查一次」的两段式（taskkill /F 之后
+    // Windows 不保证立刻摘掉这条记录，两次独立查询之间可能夹着忽隐忽现的瞬间）。传入
+    // started.at：进程号如果在等待期间被系统复用给别的更晚创建的进程，那个新进程不该
+    // 被当成我们还在等的这一个。
+    await waitForPidGone(pid, 5000, 100, started.at);
   }, 25000);
 });

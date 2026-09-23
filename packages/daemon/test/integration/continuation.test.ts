@@ -17,11 +17,13 @@ describe("续接：复用会话，续接中再续接返回 409（规格第 8 条
 
   beforeEach(async () => {
     harness = await startHarness({ capacity: 3 });
-  });
+  }, 20000);
 
+  // 全仓并行跑测试时 harness.stop() 要多花时间做假苦工进程的收尾，比 vitest 默认的
+  // 10 秒钩子超时更容易超支，显式调宽。
   afterEach(async () => {
     await harness.stop();
-  });
+  }, 30000);
 
   it("pi 续接：第 2 次运行的 --session-id 和第 1 次相同", async () => {
     const { workerId } = await submitAndWait(

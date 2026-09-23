@@ -17,11 +17,13 @@ describe("快照：排队位置与全局 SSE 首条事件（规格第 11 条）"
 
   beforeEach(async () => {
     harness = await startHarness({ capacity: 1 });
-  });
+  }, 20000);
 
+  // 全仓并行跑测试时 harness.stop() 要多花时间做假苦工进程的收尾，比 vitest 默认的
+  // 10 秒钩子超时更容易超支，显式调宽。
   afterEach(async () => {
     await harness.stop();
-  });
+  }, 30000);
 
   it("排队中的苦工带排队位置，从 1 开始按排队先后；在跑的苦工没有排队位置", async () => {
     const running = await submitWorker(harness, {

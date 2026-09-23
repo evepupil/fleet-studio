@@ -20,11 +20,13 @@ describe("重启接管：两种情形都判为已完成（规格第 9 条）", (
 
   beforeEach(async () => {
     harness = await startHarness({ capacity: 3 });
-  });
+  }, 20000);
 
+  // 全仓并行跑测试时 harness.stop() 要多花时间做假苦工进程的收尾，比 vitest 默认的
+  // 10 秒钩子超时更容易超支，显式调宽。
   afterEach(async () => {
     await harness.stop();
-  });
+  }, 30000);
 
   it("服务停掉时苦工进程继续运行，重启后接着跟踪直到完成", async () => {
     const worker = await submitWorker(harness, {
@@ -75,7 +77,8 @@ describe("重启接管：两种情形都判为已完成（规格第 9 条）", (
       trace.find((entry) => entry.event === "start"),
       "应该已经写出这个苦工的 start 轨迹",
     );
-    const pid = started.pid;
+    // 进程号会被系统复用，认「这是不是同一个苦工的 end」不能只看 pid，要看轨迹编号。
+    const traceId = requireDefined(started.traceId, "start 轨迹应该带轨迹编号");
 
     await harness.stopDaemonOnly();
 
@@ -84,7 +87,7 @@ describe("重启接管：两种情形都判为已完成（规格第 9 条）", (
     await waitFor(
       () => {
         const entries = safeReadTrace(harness.traceFile);
-        return entries.some((entry) => entry.event === "end" && entry.pid === pid);
+        return entries.some((entry) => entry.event === "end" && entry.traceId === traceId);
       },
       8000,
       100,

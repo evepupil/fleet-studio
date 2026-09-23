@@ -14,11 +14,16 @@ export function safeReadTrace(traceFile: string): TraceEntry[] {
   }
 }
 
-/** 等到轨迹文件里至少有 count 条 start 记录，返回那一刻读到的完整轨迹。 */
+/**
+ * 等到轨迹文件里至少有 count 条 start 记录，返回那一刻读到的完整轨迹。
+ * 默认给 15 秒（不是随便挑的 5 秒）：全仓并行跑测试时，光是「假苦工进程被拉起、写完
+ * 第一行轨迹」这一步本身就要和 127 个其它测试文件抢 CPU 和进程创建的名额，实测能到
+ * 十几秒；给太紧的默认值会把「本来会成功、只是稍微慢一点」的正常情况判成超时失败。
+ */
 export async function waitForTraceStarts(
   traceFile: string,
   count: number,
-  timeoutMs = 5000,
+  timeoutMs = 15000,
 ): Promise<TraceEntry[]> {
   let entries: TraceEntry[] = [];
   await waitFor(() => {

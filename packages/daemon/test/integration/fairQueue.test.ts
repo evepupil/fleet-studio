@@ -21,13 +21,16 @@ describe("公平放行：容量释放时优先补给占用最少的项目（规�
     harness = await startHarness({ capacity: 3 });
     jiaDir = await createTempDir("fleet-jia-");
     yiDir = await createTempDir("fleet-yi-");
-  });
+  }, 20000);
 
+  // 全仓并行跑测试时 harness.stop() 要多花时间做假苦工进程的收尾（见 processCleanup.ts：
+  // 先核对身份再结束、结束后再确认真的消失），这条用例还留着 4 个残留进程要收，
+  // 比 vitest 默认的 10 秒钩子超时更容易超支，显式调宽。
   afterEach(async () => {
     await harness.stop();
     await removeTempDir(jiaDir);
     await removeTempDir(yiDir);
-  });
+  }, 30000);
 
   // 这条用例要连续做好几轮轮询等待，开发机繁忙时单轮就可能超过默认预算；
   // 显式调宽测试自身的超时（项目全局 testTimeout 是 20 秒）。
