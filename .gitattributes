@@ -8,3 +8,6 @@
 *.webp binary
 *.ico binary
 *.woff2 binary
+
+# 真实抓包夹具必须逐字节保留（含 CRLF），解析器要能处理原样输出
+packages/core/test/fixtures/** -text
