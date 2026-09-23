@@ -59,10 +59,16 @@ async function recoverRun(ctx: EngineContext, run: RunRecord): Promise<void> {
     flushRemainder(replay.stdoutTailer, "stdout", replay.reducer, at, replay.drafts);
     flushRemainder(replay.stderrTailer, "stderr", replay.reducer, at, replay.drafts);
     await writeTimelineDrafts(ctx.deps.paths.timelineFile(run.id), replay.drafts);
+    const progress = replay.reducer.progress();
+    // 评审 F7：这条路径不会建跟踪器、也不会有任何轮询机会去捕获会话编号，
+    // 直接收尾之前必须自己把重放输出里已经出现过的会话编号写回苦工。
+    if (worker.sessionRef === null && progress.sessionRef !== null) {
+      ctx.deps.repos.workers.update(worker.id, { sessionRef: progress.sessionRef });
+    }
     await resolveAndFinishRun(ctx, {
       run,
       worker,
-      progress: replay.reducer.progress(),
+      progress,
       exit: { kind: "lost" },
     });
     return;

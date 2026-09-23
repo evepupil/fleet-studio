@@ -240,12 +240,20 @@ describe("createEngine：组装与生命周期（模块设计 3.1）", () => {
       await mkdir(cwd, { recursive: true });
       const summary = await engine.submit({ projectPath: cwd, cwd, prompt: "写个 hello world" });
 
-      await waitFor(() => harness.repos.runs.get(`${summary.id}.1`)?.status === "running", {
-        timeoutMs: 1000,
-      });
+      // 放行是先把状态占位成 running、之后 launcher 才异步拿到进程号写回库——两件事不是
+      // 同一时刻发生的；负载高时这个间隙会被拉长，只等 running 就读 pid 可能读到 null，
+      // 对进程号 0 触发退出会让真正的进程永远等不到收尾。这里必须连 pid 一起等。
+      // 超时上限放宽到 5 秒，避免和集成测试一起跑、机器负载高时被误判成失败。
+      await waitFor(
+        () => {
+          const current = harness.repos.runs.get(`${summary.id}.1`);
+          return current?.status === "running" && current.pid !== null;
+        },
+        { timeoutMs: 5000 },
+      );
       const run = harness.repos.runs.get(`${summary.id}.1`);
-      if (run === null || run === undefined) {
-        throw new Error("运行应该已经在跑了");
+      if (run === null || run === undefined || run.pid === null) {
+        throw new Error("运行应该已经在跑了，并且已经拿到了进程号");
       }
       const outFile = harness.deps.paths.outFile(run.id);
       await appendFile(
@@ -253,10 +261,10 @@ describe("createEngine：组装与生命周期（模块设计 3.1）", () => {
         `${piAssistantTextLine("SUMMARY: 完成\nSELF_REPORT: pass")}\n`,
         "utf8",
       );
-      harness.host.triggerExit(run.pid ?? 0, { code: 0, signal: null });
+      harness.host.triggerExit(run.pid, { code: 0, signal: null });
 
       await waitFor(() => harness.repos.runs.get(`${summary.id}.1`)?.status === "completed", {
-        timeoutMs: 1000,
+        timeoutMs: 5000,
       });
       const snapshot = engine.snapshot();
       const workerView = snapshot.workers.find((w) => w.id === summary.id);

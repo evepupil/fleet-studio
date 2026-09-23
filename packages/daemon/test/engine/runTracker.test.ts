@@ -132,6 +132,27 @@ describe("runTracker：跟踪一次运行（模块设计 3.6）", () => {
     expect(engine.repos.workers.get(setup.workerId)?.sessionRef).toBe(sessionId);
   });
 
+  it("F7 回归：opencode 运行快于跟踪节拍就退出，从没轮询过也要在退出收尾时捕获会话编号", async () => {
+    const setup = await setupTracker(engine, { runtime: "opencode", sessionRefKnown: false });
+    const sessionId = "ses_fast999";
+    // 一次性把完整的成功事件流写好，模拟运行在共享的 400ms 跟踪节拍轮到之前就已经结束——
+    // 中间从来没有调用过 tracker.poll()，退出收尾（handleExit）必须自己捕获会话编号。
+    await writeFile(
+      setup.outFile,
+      `${opencodeStepStartLine(sessionId)}\n${opencodeTextLine(sessionId, "很快就说完了")}\n${opencodeStepFinishLine(sessionId)}\n`,
+      "utf8",
+    );
+
+    const tracker = engine.ctx.trackers.get(setup.runId);
+    if (tracker === undefined) {
+      throw new Error("跟踪器没有注册成功");
+    }
+    await tracker.handleExit({ code: 0, signal: null });
+
+    expect(engine.repos.workers.get(setup.workerId)?.sessionRef).toBe(sessionId);
+    expect(engine.repos.runs.get(setup.runId)?.status).toBe("completed");
+  });
+
   it("pi 连续失败达到上限进入 ended：10 秒内不结束进程，超过 10 秒后结束它", async () => {
     const setup = await setupTracker(engine);
     const lines = Array.from({ length: PI_MAX_CONSECUTIVE_FAILURES }, () =>

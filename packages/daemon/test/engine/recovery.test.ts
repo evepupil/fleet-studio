@@ -2,15 +2,22 @@ import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runRecovery } from "../../src/engine/recovery.js";
 import { createProjectRecord, createRunRecord, createWorkerRecord } from "./support/records.js";
-import { piAgentSettledLine, piAssistantTextLine } from "./support/runtimeLines.js";
+import {
+  opencodeStepFinishLine,
+  opencodeStepStartLine,
+  opencodeTextLine,
+  piAgentSettledLine,
+  piAssistantTextLine,
+} from "./support/runtimeLines.js";
 import { createTestEngine, type TestEngine } from "./support/testEngine.js";
 
 async function seedRunningWorker(
   engine: TestEngine,
   overrides: Parameters<typeof createRunRecord>[0],
   preExistingOutput?: string,
+  workerOverrides: Parameters<typeof createWorkerRecord>[0] = {},
 ) {
-  const worker = createWorkerRecord();
+  const worker = createWorkerRecord(workerOverrides);
   const run = createRunRecord({
     status: "running",
     startedAt: "2026-01-01T00:00:01.000Z",
@@ -92,6 +99,24 @@ describe("recovery：服务启动时接管（模块设计 3.14）", () => {
     const updated = engine.repos.runs.get(run.id);
     expect(updated?.status).toBe("completed");
     expect(updated?.finalText).toBe("干完收工");
+  });
+
+  it("F7 回归：opencode 运行接管时发现进程已经不在了，重放输出里的会话编号要写回苦工", async () => {
+    const pid = 7004;
+    engine.host.registerExistingProcess(pid, false); // 已经不在了
+    const sessionId = "ses_recovered1";
+    const preExisting = `${opencodeStepStartLine(sessionId)}\n${opencodeTextLine(sessionId, "重启前已经说完了")}\n${opencodeStepFinishLine(sessionId)}\n`;
+    const { worker, run } = await seedRunningWorker(
+      engine,
+      { pid, processImage: "fake-runtime.exe" },
+      preExisting,
+      { runtime: "opencode", sessionRef: null },
+    );
+
+    await runRecovery(engine.ctx);
+
+    expect(engine.repos.workers.get(worker.id)?.sessionRef).toBe(sessionId);
+    expect(engine.repos.runs.get(run.id)?.status).toBe("completed");
   });
 
   it("进程已经不在了，输出里也没有正常收尾：判失败 interrupted", async () => {

@@ -186,6 +186,10 @@ export function createRunTracker(
       flushRemainder(stdoutTailer, "stdout", reducer, at, drafts);
       flushRemainder(stderrTailer, "stderr", reducer, at, drafts);
       await publishDrafts(drafts);
+      // 评审 F7：进程可能在共享的 400ms 跟踪节拍轮到之前就已经退出——opencode 的会话编号
+      // 之前只在 pollInternal 里捕获，这条「进程退出」路径自己不会再被轮询到，
+      // 必须在这里也捕获一次，否则事件流里已经出现过的会话编号会一直没写回苦工。
+      maybeCaptureSessionRef(reducer.progress());
       await finishInternal({ kind: "exited", code: exit.code, signal: exit.signal });
     } catch (error) {
       ctx.deps.logger.error(`处理运行 ${runId} 的进程退出出错`, error);
