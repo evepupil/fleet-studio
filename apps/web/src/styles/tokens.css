@@ -1,1 +1,155 @@
-/* 待实现：设计令牌（见 前端设计 文档） */
+/*
+ * 设计令牌：唯一允许出现色值的文件。数值与 docs/前端设计.md 第 3 节逐一对应，改这里必须同步改文档。
+ * 默认暗色；系统偏好浅色时切换为浅色值。
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* 中性色 */
+  --bg-page: #0b0c0e;
+  --bg-panel: #111214;
+  --bg-raised: #17181b;
+  --bg-overlay: #1c1d21;
+  --bg-hover: #16171a;
+  --bg-selected: #1b2333;
+  --line: #1f2023;
+  --line-strong: #2a2b30;
+  --meter-track: #1a1b1e;
+  --text-1: #ececee;
+  --text-2: #a3a3ab;
+  --text-3: #8b8b94;
+  --accent: #6b9eff;
+  --accent-soft: rgba(107, 158, 255, 0.16);
+  --on-accent: #0b0c0e;
+
+  /* 状态色 */
+  --st-queued: #a3a3ab;
+  --st-running: #6ea8fe;
+  --st-done: #4cc38a;
+  --st-failed: #ff7070;
+  --st-cancelled: #8b8b94;
+  --st-warning: #f2b544;
+  --st-warning-soft: rgba(242, 181, 68, 0.09);
+  --st-failed-soft: rgba(255, 112, 112, 0.09);
+
+  /* 项目色：8 个固定顺序的分类色，只画在容量格和色点上 */
+  --proj-0: #3987e5;
+  --proj-1: #d95926;
+  --proj-2: #199e70;
+  --proj-3: #c98500;
+  --proj-4: #d55181;
+  --proj-5: #008300;
+  --proj-6: #9085e9;
+  --proj-7: #e66767;
+
+  /* 重试斜纹：叠在项目色上的半透明细线 */
+  --hatch: rgba(11, 12, 14, 0.55);
+
+  /* 阴影：只有悬浮提示卡使用 */
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px #2a2b30;
+
+  /* 字体 */
+  --font-sans:
+    "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "JetBrains Mono", Consolas, "Microsoft YaHei UI", monospace;
+
+  /* 字阶：字号 / 行高 */
+  --fs-11: 11px;
+  --lh-11: 16px;
+  --fs-12: 12px;
+  --lh-12: 18px;
+  --fs-13: 13px;
+  --lh-13: 20px;
+  --fs-14: 14px;
+  --lh-14: 20px;
+  --fs-16: 16px;
+  --lh-16: 24px;
+  --fs-22: 22px;
+  --lh-22: 28px;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  /* 间距（4px 基准） */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* 圆角 */
+  --r-slot: 3px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+
+  /* 尺寸 */
+  --appbar-h: 40px;
+  --banner-h: 32px;
+  --sidebar-w: 340px;
+  --slot-h: 18px;
+  --slot-gap: 2px;
+
+  /* 层级 */
+  --z-sticky: 10;
+  --z-banner: 20;
+  --z-tooltip: 30;
+
+  /* 动效 */
+  --dur-fast: 120ms;
+  --dur-base: 160ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+
+    --bg-page: #f6f6f3;
+    --bg-panel: #ffffff;
+    --bg-raised: #fafaf8;
+    --bg-overlay: #ffffff;
+    --bg-hover: #f1f0ec;
+    --bg-selected: #eaf0fe;
+    --line: #e6e5e0;
+    --line-strong: #d6d5cf;
+    --meter-track: #efeee9;
+    --text-1: #1a1a18;
+    --text-2: #55544f;
+    --text-3: #696862;
+    --accent: #2f5fd0;
+    --accent-soft: rgba(47, 95, 208, 0.1);
+    --on-accent: #ffffff;
+
+    --st-queued: #55544f;
+    --st-running: #2563d6;
+    --st-done: #13773a;
+    --st-failed: #c62f2f;
+    --st-cancelled: #696862;
+    --st-warning: #8c5a00;
+    --st-warning-soft: rgba(140, 90, 0, 0.08);
+    --st-failed-soft: rgba(198, 47, 47, 0.07);
+
+    --proj-0: #2a78d6;
+    --proj-1: #eb6834;
+    --proj-2: #1baf7a;
+    --proj-3: #eda100;
+    --proj-4: #e87ba4;
+    --proj-5: #008300;
+    --proj-6: #4a3aa7;
+    --proj-7: #e34948;
+
+    --hatch: rgba(255, 255, 255, 0.6);
+
+    --shadow-overlay: 0 8px 24px rgba(20, 20, 18, 0.12), 0 0 0 1px #e6e5e0;
+  }
+}
+
+@media (max-width: 1279px) {
+  :root {
+    --sidebar-w: 300px;
+  }
+}
