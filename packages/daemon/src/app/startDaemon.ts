@@ -105,6 +105,13 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
 
   const config = openConfigStore(paths.configFile, logger);
   const repos = createRepos(paths.dbFile);
+
+  // 装配到一半失败时，catch 需要知道具体走到哪一步：引擎建好、HTTP 真正监听之后才
+  // 分别赋值，失败时按"已经创建成功的部分"清理，避免 HTTP 还在监听、daemon.json 还留着，
+  // 导致同一进程里再次 startDaemon 被单实例检测误判成"服务已在运行"。
+  let engine: ReturnType<typeof createEngine> | null = null;
+  let httpHandle: HttpServerHandle | null = null;
+
   try {
     const host = createProcessHost({ getConfig: () => config.current(), logger });
     const version = options.version;
@@ -118,7 +125,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
     const getPort = (): number => actualPort;
     const shutdownListeners = new Set<() => void>();
 
-    const engine = createEngine({
+    engine = createEngine({
       repos,
       host,
       config,
@@ -140,7 +147,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
     const app = createHttpApp({ service: engine, token, getPort, webDistDir, logger });
 
     const requestedPort = options.port ?? config.current().port;
-    const httpHandle = await bindHttpServer(app, requestedPort);
+    httpHandle = await bindHttpServer(app, requestedPort);
     actualPort = httpHandle.port;
 
     await writeDaemonInfo(paths.daemonInfoFile, {
@@ -156,8 +163,10 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
 
     let stopPromise: Promise<void> | null = null;
     async function performStop(): Promise<void> {
-      await engine.stop();
-      await httpHandle.close();
+      // engine/httpHandle 在闭包里被当作可能为 null 的类型（供失败清理复用同一对变量），
+      // 但 performStop 只会通过下面返回的 stop() 调用，届时两者必然已经赋值成功。
+      await engine?.stop();
+      await httpHandle?.close();
       repos.close();
       config.close();
       await removeDaemonInfoIfOwned(paths.daemonInfoFile, process.pid);
@@ -180,10 +189,38 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
       },
     };
   } catch (error) {
-    // 装配到一半失败：数据库连接、配置轮询定时器都已经建好了，必须关掉，
-    // 否则测试反复调用 startDaemon 失败会一直攒着没人清理的定时器和文件句柄。
-    repos.close();
-    config.close();
+    // 按"引擎停止（如已创建）→ HTTP 关闭（如已监听）→ 删自己写的 daemon.json（如已写）→
+    // 数据库关闭 → 配置关闭"顺序清理已经装配成功的部分；每一步单独兜住异常，不让某一步
+    // 的清理失败连带影响后面几步，最后抛出的是原始错误，不是清理过程里的错误。
+    if (engine !== null) {
+      try {
+        await engine.stop();
+      } catch (cleanupError) {
+        logger.error("装配失败后停引擎出错", cleanupError);
+      }
+    }
+    if (httpHandle !== null) {
+      try {
+        await httpHandle.close();
+      } catch (cleanupError) {
+        logger.error("装配失败后关 HTTP 出错", cleanupError);
+      }
+    }
+    try {
+      await removeDaemonInfoIfOwned(paths.daemonInfoFile, process.pid);
+    } catch (cleanupError) {
+      logger.error("装配失败后删 daemon.json 出错", cleanupError);
+    }
+    try {
+      repos.close();
+    } catch (cleanupError) {
+      logger.error("装配失败后关数据库出错", cleanupError);
+    }
+    try {
+      config.close();
+    } catch (cleanupError) {
+      logger.error("装配失败后关配置出错", cleanupError);
+    }
     throw error;
   }
 }
