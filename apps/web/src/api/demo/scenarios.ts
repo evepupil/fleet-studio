@@ -75,7 +75,12 @@ function positionsOf(dataset: Dataset): ReadonlyMap<string, number> {
     if (run.status === "running") {
       running.push({ runId: run.id, poolId: worker.poolId, projectKey: worker.projectKey });
     } else if (run.status === "queued") {
-      queued.push({ runId: run.id, poolId: worker.poolId, projectKey: worker.projectKey, queuedAt: run.queuedAt });
+      queued.push({
+        runId: run.id,
+        poolId: worker.poolId,
+        projectKey: worker.projectKey,
+        queuedAt: run.queuedAt,
+      });
     }
   }
   return queuePositions(limits, running, queued);
@@ -109,9 +114,17 @@ export function buildDemoScenario(name: DemoScenarioName): DemoScenario {
   const details = new Map<string, WorkerDetail>();
   const timelines = new Map<string, TimelineEvent[]>();
   for (const worker of dataset.workers) {
-    const runs = dataset.runs.filter((run) => run.workerId === worker.id).sort((a, b) => a.seq - b.seq);
-    details.set(worker.id, buildWorkerDetail(worker, runs, projectOf(worker.projectKey), demoConfig, positions));
-    timelines.set(worker.id, assembleTimeline(runs.map((run) => ({ run, drafts: demoDrafts[run.id] ?? [] }))));
+    const runs = dataset.runs
+      .filter((run) => run.workerId === worker.id)
+      .sort((a, b) => a.seq - b.seq);
+    details.set(
+      worker.id,
+      buildWorkerDetail(worker, runs, projectOf(worker.projectKey), demoConfig, positions),
+    );
+    timelines.set(
+      worker.id,
+      assembleTimeline(runs.map((run) => ({ run, drafts: demoDrafts[run.id] ?? [] }))),
+    );
   }
   return { snapshot, details, timelines, connection: name === "offline" ? "lost" : "open" };
 }
