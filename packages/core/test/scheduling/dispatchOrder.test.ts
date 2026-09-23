@@ -93,6 +93,23 @@ describe("dispatchOrder", () => {
     expect(result.blocked).toEqual(["a3"]);
   });
 
+  it("两个项目同时被单项目上限挡住：blocked 按全局排队时间跨项目交叉排序，不按项目分组拼接（D6①）", () => {
+    const queued = [
+      q("a1", "a", "2026-01-01T00:00:00Z"),
+      q("a2", "a", "2026-01-01T00:00:02Z"),
+      q("a3", "a", "2026-01-01T00:00:04Z"),
+      q("b1", "b", "2026-01-01T00:00:01Z"),
+      q("b2", "b", "2026-01-01T00:00:03Z"),
+      q("b3", "b", "2026-01-01T00:00:05Z"),
+    ];
+    const result = dispatchOrder(limit({ perProjectCap: 1 }), [], queued);
+    // a、b 各自放行队首一个就撞上限 1；剩下的 a2/a3/b2/b3 按各自排队时间整体重新排序，
+    // 应该交替出现 a2、b2、a3、b3。如果实现退化成“按项目分组再拼接剩余队列”，
+    // 这里会得到 [a2, a3, b2, b3]，跟按全局时间交叉排序的预期不一致。
+    expect(result.eligible).toEqual(["a1", "b1"]);
+    expect(result.blocked).toEqual(["a2", "b2", "a3", "b3"]);
+  });
+
   it("其他池的条目被忽略：不影响占用计数也不出现在结果里", () => {
     const running = [r("other-run", "a", "other-pool")];
     const queued = [

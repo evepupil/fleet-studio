@@ -7,6 +7,8 @@ import {
   type TimelineDraft,
   TOOL_RESULT_PREVIEW_MAX,
 } from "../../../src/domain/timeline.js";
+import type { ProcessExit } from "../../../src/lifecycle/index.js";
+import { resolveRunOutcome } from "../../../src/lifecycle/index.js";
 import { opencodeAdapter } from "../../../src/runtimes/opencode/index.js";
 
 const FIXTURES_DIR = join(dirname(fileURLToPath(import.meta.url)), "../../fixtures/opencode");
@@ -467,5 +469,62 @@ describe("opencodeAdapter.createReducer：单条规则", () => {
     expect(reducer.progress().plainOutputTail).toBe(
       ["line 3", "line 4", "line 5", "line 6", "line 7"].join("\n"),
     );
+  });
+});
+
+describe("opencodeAdapter.createReducer：stderr 夹带权限拒绝提示不影响成功判定（D6②）", () => {
+  it("stdout 正常走完成功流程，stderr 混入一行 auto-rejecting 提示：outcome 仍是已完成，resolveRunOutcome 也判完成", () => {
+    const reducer = opencodeAdapter.createReducer();
+    reducer.push(
+      JSON.stringify({ type: "step_start", timestamp: 1, sessionID: "ses_1" }),
+      "stdout",
+      "t",
+    );
+    // --auto 模式下，opencode 遇到不在允许列表里的工具调用会自动拒绝，并在 stderr 打一行
+    // 提示；这不是事件流 JSON，只是纯文本，按规格应该落进 output/plainOutputTail，
+    // 不该影响后面 step_finish 给出的结局判定。
+    const stderrDrafts = reducer.push(
+      "permission requested: bash (*); auto-rejecting",
+      "stderr",
+      "t",
+    );
+    reducer.push(
+      JSON.stringify({ type: "text", timestamp: 2, sessionID: "ses_1", part: { text: "已完成" } }),
+      "stdout",
+      "t",
+    );
+    reducer.push(
+      JSON.stringify({
+        type: "step_finish",
+        timestamp: 3,
+        sessionID: "ses_1",
+        part: {
+          reason: "stop",
+          tokens: { input: 10, output: 5, cache: { read: 0, write: 0 }, total: 15 },
+          cost: 0,
+        },
+      }),
+      "stdout",
+      "t",
+    );
+
+    expect(stderrDrafts).toEqual([
+      {
+        kind: "output",
+        at: "t",
+        stream: "stderr",
+        text: "permission requested: bash (*); auto-rejecting",
+      },
+    ]);
+
+    const progress = reducer.progress();
+    expect(progress.outcome).toEqual({ status: "completed" });
+    expect(progress.plainOutputTail).toBe("permission requested: bash (*); auto-rejecting");
+
+    // 交给 resolveRunOutcome 合并退出信息（退出码 0）：事件流已经给出「已完成」，
+    // 规则 1 直接命中，不会被规则 8 的 plainOutputTail 兜底逻辑误判成失败。
+    const exit: ProcessExit = { kind: "exited", code: 0, signal: null };
+    const resolved = resolveRunOutcome({ progress, exit, killedBy: null, timeoutMs: 30 * 60_000 });
+    expect(resolved).toEqual({ status: "completed", failReason: null, message: null });
   });
 });

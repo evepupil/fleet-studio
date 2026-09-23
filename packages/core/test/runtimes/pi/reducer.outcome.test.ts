@@ -28,25 +28,31 @@ function stopLine(text = "完成"): string {
 }
 
 describe("pi reducer：agent_settled 收尾（模块设计 4.5）", () => {
-  it("最后一个 stopReason 是 stop → 结局已完成", () => {
+  // agent_settled 只给暂定结局，阶段维持不变（不再像之前那样被强行钉成 "ended"）：
+  // 下面三个用例里阶段分别停在 "working"/"retrying"，跟进来之前那条助手消息的收尾分支一致。
+  // 唯一能进入 "ended" 的途径是连续失败达到上限，见下面「连续失败达到上限」一组用例。
+  it("最后一个 stopReason 是 stop → 结局已完成，阶段停在 working", () => {
     const reducer = createPiReducer();
     feedLines(reducer, [stopLine(), JSON.stringify({ type: "agent_settled" })]);
-    expect(reducer.progress()).toMatchObject({ phase: "ended", outcome: { status: "completed" } });
+    expect(reducer.progress()).toMatchObject({
+      phase: "working",
+      outcome: { status: "completed" },
+    });
   });
 
-  it("最后一个 stopReason 是 error（自然收尾，没到连续失败上限）→ 失败 model_error", () => {
+  it("最后一个 stopReason 是 error（自然收尾，没到连续失败上限）→ 失败 model_error，阶段停在 retrying", () => {
     const reducer = createPiReducer();
     feedLines(reducer, [
       errorLine("404: model not found"),
       JSON.stringify({ type: "agent_settled" }),
     ]);
     expect(reducer.progress()).toMatchObject({
-      phase: "ended",
+      phase: "retrying",
       outcome: { status: "failed", reason: "model_error", message: "404: model not found" },
     });
   });
 
-  it("最后一个 stopReason 是 aborted → 失败 runtime_error「模型调用被中止」（真实样本没抓到这种情况，按规格构造）", () => {
+  it("最后一个 stopReason 是 aborted → 失败 runtime_error「模型调用被中止」，阶段停在 working（真实样本没抓到这种情况，按规格构造）", () => {
     const reducer = createPiReducer();
     const abortedLine = JSON.stringify({
       type: "message_end",
@@ -59,7 +65,7 @@ describe("pi reducer：agent_settled 收尾（模块设计 4.5）", () => {
     });
     feedLines(reducer, [abortedLine, JSON.stringify({ type: "agent_settled" })]);
     expect(reducer.progress()).toMatchObject({
-      phase: "ended",
+      phase: "working",
       outcome: { status: "failed", reason: "runtime_error", message: "模型调用被中止" },
     });
   });
@@ -126,6 +132,66 @@ describe("pi reducer：连续失败达到上限主动放弃（不等 agent_settl
     const outcomeAfterGiveUp = reducer.progress().outcome;
     feedLines(reducer, [stopLine(), JSON.stringify({ type: "agent_settled" })]);
     expect(reducer.progress().outcome).toEqual(outcomeAfterGiveUp);
+  });
+
+  it("放弃之后再来一条成功消息：结局仍是失败、阶段仍是 ended（D1 验证要求③，之前会被成功消息拉回 working）", () => {
+    const reducer = createPiReducer();
+    for (let i = 0; i < PI_MAX_CONSECUTIVE_FAILURES; i += 1) {
+      feedLines(reducer, [errorLine("Connection error.")]);
+    }
+    expect(reducer.progress().phase).toBe("ended");
+    const outcomeAfterGiveUp = reducer.progress().outcome;
+
+    feedLines(reducer, [stopLine()]);
+    expect(reducer.progress().phase).toBe("ended");
+    expect(reducer.progress().outcome).toEqual(outcomeAfterGiveUp);
+
+    // 再来一次 agent_settled 也一样：放弃是终态，不会被重新判定。
+    feedLines(reducer, [JSON.stringify({ type: "agent_settled" })]);
+    expect(reducer.progress().phase).toBe("ended");
+    expect(reducer.progress().outcome).toEqual(outcomeAfterGiveUp);
+  });
+});
+
+describe("pi reducer：D1 回归——agent_settled 不是终点（真实样本 s06 的重试风暴模式）", () => {
+  it("通道报错触发一次 agent_settled 判定失败后，新一轮成功收尾：最终结局是已完成，不是失败", () => {
+    // 复现 D1 缺陷报告里的确切事件序列：agent_settled 之后 pi 用新的 agent_start 开了
+    // 新一轮对话，这一轮顺利成功；旧代码会把第一次 agent_settled 判的失败结局钉死，
+    // 修复后应该看到最终结局跟着最新一轮的结果走。
+    const reducer = createPiReducer();
+    feedLines(reducer, [
+      JSON.stringify({ type: "agent_start" }),
+      JSON.stringify({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          content: [],
+          stopReason: "error",
+          errorMessage: "Connection error.",
+          timestamp: 1_700_000_000_000,
+        },
+      }),
+      JSON.stringify({
+        type: "auto_retry_start",
+        attempt: 1,
+        maxAttempts: 3,
+        delayMs: 2000,
+        errorMessage: "Connection error.",
+      }),
+      JSON.stringify({ type: "agent_settled" }),
+      JSON.stringify({ type: "agent_start" }),
+      JSON.stringify({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "完成" }],
+          stopReason: "stop",
+          timestamp: 1_700_000_001_000,
+        },
+      }),
+      JSON.stringify({ type: "agent_settled" }),
+    ]);
+    expect(reducer.progress().outcome).toEqual({ status: "completed" });
   });
 });
 

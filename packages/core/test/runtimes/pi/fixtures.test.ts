@@ -1,7 +1,9 @@
 /**
  * 用真实抓到的 pi --mode json 样本逐行喂 reducer，检查整段流最终的进展。
  * 样本来源：.scratch/samples/pi/README.md（s01~s05、s08 是调研抓的失败/重试路径，
- * real-success-tools.stdout.jsonl 是本次任务在 %TEMP%\fleet-pi-lane\ 下实测抓到的真实成功流）。
+ * real-success-tools.stdout.jsonl 是本次任务在 %TEMP%\fleet-pi-lane\ 下实测抓到的真实成功流，
+ * s06-retry-storm-trimmed.stdout.jsonl 是从 s06-connection-retry-storm 抓包裁出来的片段，
+ * 裁剪规则见下面对应用例里的注释）。
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -40,7 +42,9 @@ describe("真实样本：real-success-tools（本次任务实测抓到的真实�
       "text",
     ]);
     expect(progress).toMatchObject({
-      phase: "ended",
+      // agent_settled 只给暂定结局、阶段不再被强行钉成 "ended"（模块设计 4.5 节）：
+      // 这次流程全程没有失败，最后一条助手消息是 stop，阶段应停在 working。
+      phase: "working",
       outcome: { status: "completed" },
       sessionRef: "fleet-lane-probe",
       model: "mcgrox/deepseek-v4.1-flash",
@@ -109,6 +113,29 @@ describe("真实样本：s01/s02/s03（mcgrox 网关故障期间抓到的连接�
   });
 });
 
+describe("真实样本：s06-retry-storm-trimmed（D1 验证②：从 s06 抓包裁出的重试风暴片段）", () => {
+  it("两轮独立的失败重试都以成功收尾：全程没到放弃上限，阶段不会被钉成 ended", () => {
+    // 裁剪规则：源文件 .scratch/samples/pi/s06-connection-retry-storm.stdout.jsonl
+    // （16003 行，一次 pi 进程在通道持续报错下反复放弃重开，全程 21 次 agent_start、
+    // 11 次 agent_settled，约 4.3MB）体积太大不适合当夹具。这里去掉全部
+    // message_update 行（只是流式增量，不影响结局判定），只保留到第 3 次
+    // agent_settled 之后紧跟的下一个 agent_start 为止（源文件第 694 行/0 基索引
+    // 693），裁剪后剩 65 行、约 27KB。
+    const { progress } = replay([{ name: "s06-retry-storm-trimmed.stdout.jsonl" }]);
+
+    // 这段夹具里有两轮独立的失败重试：第一轮连续 4 次 stopReason=error（实数出来的
+    // 连续失败次数，远低于放弃所需的 PI_MAX_CONSECUTIVE_FAILURES=8），agent_settled
+    // 只给暂定的失败结局、阶段停在 retrying；紧接着新一轮 agent_start 带来一条成功
+    // 消息，把暂定的失败结局清空、阶段推进到 working；第二轮又出现 1 次失败后同样以
+    // 成功收尾。全程连续失败次数从未接近上限，阶段自然不会被钉成 "ended"。
+    expect(progress.phase).toBe("working");
+    expect(progress.outcome).toEqual({ status: "completed" });
+    expect(progress.retry).toBeNull();
+    expect(progress.sessionRef).toBe("01a0cd5e-e5af-7649-8616-aa207359552b");
+    expect(progress.finalText).toBe("exactly");
+  });
+});
+
 describe("真实样本：s04（一次可重试错误之后，真正的 404 错误自然收尾）", () => {
   it("agent_settled 到达后按最后一次错误判定 model_error", () => {
     const { drafts, progress } = replay([
@@ -117,7 +144,9 @@ describe("真实样本：s04（一次可重试错误之后，真正的 404 错�
     ]);
     // 最后一个 "output" 来自 stderr 那行 pi 自己打的 warning（不是 JSON），跟结局判定无关。
     expect(drafts.map((draft) => draft.kind)).toEqual(["error", "retry", "error", "output"]);
-    expect(progress.phase).toBe("ended");
+    // 两次错误连续失败次数只到 2，远没到放弃上限：agent_settled 只给暂定结局，
+    // 阶段仍停在 retrying，不会被强行钉成 ended（模块设计 4.5 节）。
+    expect(progress.phase).toBe("retrying");
     const outcome = progress.outcome;
     expect(outcome?.status).toBe("failed");
     if (outcome?.status === "failed") {
@@ -133,7 +162,9 @@ describe("真实样本：s08（第一次请求就是不可重试的错误，没�
   it("零次重试直接 agent_settled，同样判定 model_error", () => {
     const { drafts, progress } = replay([{ name: "s08-stdin-ignore-ok.stdout.jsonl" }]);
     expect(drafts.map((draft) => draft.kind)).toEqual(["error"]);
-    expect(progress.phase).toBe("ended");
+    // 只有 1 次失败，远没到放弃上限：agent_settled 给暂定的失败结局，阶段停在 retrying
+    // （模块设计 4.5 节；唯一能进入 ended 的途径是连续失败达到上限）。
+    expect(progress.phase).toBe("retrying");
     expect(progress.outcome).toMatchObject({ status: "failed", reason: "model_error" });
   });
 });

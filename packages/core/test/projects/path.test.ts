@@ -47,6 +47,21 @@ describe("normalizeProjectPath · win32", () => {
     );
   });
 
+  it("UNC 缺 share 段时，末尾分隔符也要去掉（D3）：有没有末尾反斜杠结果一样", () => {
+    expect(normalizeProjectPath("\\\\server", "win32")).toBe("\\\\server");
+    expect(normalizeProjectPath("\\\\server\\", "win32")).toBe("\\\\server");
+  });
+
+  it("UNC 带 share 段时，末尾分隔符仍要去掉（D3 的对照组：这个组合本来就是对的）", () => {
+    expect(normalizeProjectPath("\\\\server\\share", "win32")).toBe("\\\\server\\share");
+    expect(normalizeProjectPath("\\\\server\\share\\", "win32")).toBe("\\\\server\\share");
+  });
+
+  it("UNC 缺 share 段的正斜杠写法，末尾分隔符同样要去掉", () => {
+    expect(normalizeProjectPath("//server", "win32")).toBe("\\\\server");
+    expect(normalizeProjectPath("//server/", "win32")).toBe("\\\\server");
+  });
+
   it("相对路径抛 FleetError(invalid_request)", () => {
     expect.assertions(2);
     try {

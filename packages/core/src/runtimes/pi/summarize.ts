@@ -55,7 +55,15 @@ export function resolveEventAt(event: Record<string, unknown>, fallbackAt: strin
   }
   const message = getRecord(event, "message");
   const epochMs = message === undefined ? undefined : getFiniteNumber(message, "timestamp");
-  return epochMs === undefined ? fallbackAt : new Date(epochMs).toISOString();
+  if (epochMs === undefined) {
+    return fallbackAt;
+  }
+  try {
+    return new Date(epochMs).toISOString();
+  } catch {
+    // 极端越界数值（例如 1e20）会让 toISOString 抛 RangeError：按没有时间戳处理，退回调用方传入的 at。
+    return fallbackAt;
+  }
 }
 
 export function getArray(record: Record<string, unknown>, key: string): unknown[] | undefined {

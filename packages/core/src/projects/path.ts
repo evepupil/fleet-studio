@@ -69,7 +69,13 @@ function normalizeWin32(trimmed: string, rawInput: string): string {
 
   if (isUnc) {
     // segments 形如 ["", "", server, share, ...]；server、share 是 UNC 的根，.. 不能越过它们。
-    const resolved = resolveDotSegments(segments, 4);
+    // share 段可能缺失（"\\server" 或 "\\server\" 这种没有 share 名的写法）：这时
+    // segments[3] 要么不存在，要么是 collapseBackslashes 为保留末尾分隔符而留下的空字符串，
+    // 不能当成真的 share 名一起保护起来，否则末尾分隔符去不掉（"\\server\" 应该归一化成
+    // "\\server"，跟没有尾部分隔符的 "\\server" 一样）。
+    const hasShare = segments.length > 4 || (segments.length === 4 && segments[3] !== "");
+    const rootDepth = hasShare ? 4 : 3;
+    const resolved = resolveDotSegments(segments, rootDepth);
     return `\\\\${resolved.slice(2).join("\\")}`;
   }
 

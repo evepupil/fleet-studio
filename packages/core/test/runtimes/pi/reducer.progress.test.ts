@@ -73,6 +73,21 @@ describe("pi reducer：eventCount 与 lastEventAt", () => {
     expect(reducer.progress().lastEventAt).toBe(new Date(1_700_000_000_000).toISOString());
   });
 
+  it("message.timestamp 越界（超出 Date 能表示的范围）时按没有时间戳处理，落回调用方传入的 at，且不抛异常（D2）", () => {
+    const reducer = createPiReducer();
+    // 1e20 毫秒远超 Date 能表示的范围（±8.64e15），new Date(1e20).toISOString() 会抛 RangeError；
+    // push 必须整体不抛异常，按规格退回调用方传入的 at。
+    expect(() =>
+      feedLines(
+        reducer,
+        [assistantMessageEndLine({ timestamp: 1e20 })],
+        "stdout",
+        "2026-01-01T00:00:00.000Z",
+      ),
+    ).not.toThrow();
+    expect(reducer.progress().lastEventAt).toBe("2026-01-01T00:00:00.000Z");
+  });
+
   it("没有自带时间的事件（如 agent_start）落回调用方传入的 at", () => {
     const reducer = createPiReducer();
     feedLines(

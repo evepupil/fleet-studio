@@ -18,8 +18,8 @@ describe("pickColorIndex", () => {
   it("全部占满时用 seed 的 FNV-1a 哈希取模，结果和公式手算一致", () => {
     const taken = Array.from({ length: PROJECT_PALETTE_SIZE }, (_, i) => i);
     // FNV-1a 32 位偏移基数 0x811c9dc5 = 2166136261，空字符串没有字符参与运算，
-    // 哈希就是偏移基数本身；2166136261 % 10 = 1，这个结果不依赖本模块的实现。
-    expect(pickColorIndex(taken, "")).toBe(1);
+    // 哈希就是偏移基数本身；2166136261 % 8 = 5，这个结果不依赖本模块的实现。
+    expect(pickColorIndex(taken, "")).toBe(5);
   });
 
   it("全部占满时同一个 seed 结果稳定", () => {

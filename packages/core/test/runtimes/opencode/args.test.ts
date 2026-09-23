@@ -135,15 +135,34 @@ describe("opencodeAdapter.buildLaunch", () => {
     expect(error.message).toBe("池 onlypi 没有为 opencode 指定模型");
   });
 
-  it("正文超过 ARGV_PROMPT_MAX_CHARS 时写文件，命令行换成固定提示并带 -f", () => {
+  it("正文超过 ARGV_PROMPT_MAX_CHARS 时写文件，-f 紧跟路径之后是 --thinking 而不是消息（D4）", () => {
+    // -f 在 opencode 里是 [array] 类型参数：会一直吞后面的位置参数直到遇到下一个开关，
+    // 所以 -f <路径> 后面必须紧跟 --thinking 把数组截断，否则排在最后的任务正文消息
+    // 也会被当成 -f 的附件一起吞掉（旧顺序 --thinking -f <路径> <消息> 就是这么坏的）。
     const longPrompt = "a".repeat(ARGV_PROMPT_MAX_CHARS + 1);
     const spec = opencodeAdapter.buildLaunch(
       baseInput({ prompt: longPrompt, runDir: "C:\\temp\\run1" }),
     );
     expect(spec.files).toEqual([{ path: "C:\\temp\\run1\\task.md", content: longPrompt }]);
+    expect(spec.args).toEqual([
+      "run",
+      "--format",
+      "json",
+      "--auto",
+      "--dir",
+      "C:\\code\\demo",
+      "-m",
+      "mcgrox/deepseek-v4.1-flash",
+      "--title",
+      "示例任务",
+      "-f",
+      "C:\\temp\\run1\\task.md",
+      "--thinking",
+      "请完整阅读并执行附件文件里的任务说明。",
+    ]);
     const fileFlagIndex = spec.args.indexOf("-f");
-    expect(fileFlagIndex).toBeGreaterThan(-1);
     expect(spec.args[fileFlagIndex + 1]).toBe("C:\\temp\\run1\\task.md");
+    expect(spec.args[fileFlagIndex + 2]).toBe("--thinking");
     expect(spec.args.at(-1)).toBe("请完整阅读并执行附件文件里的任务说明。");
   });
 

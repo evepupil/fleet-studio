@@ -39,6 +39,8 @@ class PiStreamReducer implements StreamReducer {
   #sessionRef: string | null = null;
   #phase: RunProgress["phase"] = "starting";
   #outcome: RunOutcome | null = null;
+  /** 连续失败达到上限、判定放弃之后恒为 true：结局和阶段自此是终态，不再随后续事件变化。 */
+  #gaveUp = false;
   #retry: RetryInfo | null = null;
   #usage: Usage = ZERO_USAGE;
   #activity: string | null = null;
@@ -186,11 +188,20 @@ class PiStreamReducer implements StreamReducer {
       if (stopReason !== undefined) {
         this.#lastStopReason = stopReason;
       }
-      this.#consecutiveFailures = 0;
-      this.#retry = null;
-      this.#phase = "working";
       if (textItems.length > 0) {
         this.#finalText = textItems.join("\n\n");
+      }
+      // 已经因连续失败放弃：结局和阶段是终态，哪怕之后又来一条成功消息也不再改变
+      // （模块设计 4.5 节第 3 条）。
+      if (!this.#gaveUp) {
+        this.#consecutiveFailures = 0;
+        this.#retry = null;
+        this.#phase = "working";
+        // 暂定的失败结局清空为 null，等下一次 agent_settled 按最新 stopReason 重新判定
+        // （模块设计 4.5 节第 2 条）。
+        if (this.#outcome?.status === "failed") {
+          this.#outcome = null;
+        }
       }
     }
 
@@ -239,6 +250,11 @@ class PiStreamReducer implements StreamReducer {
     this.#lastErrorMessage = errorMessage;
     drafts.push({ kind: "error", at, message: errorMessage });
 
+    if (this.#gaveUp) {
+      // 已经判定放弃：结局和阶段是终态，不再随后续的错误变化（模块设计 4.5 节第 3 条）。
+      return;
+    }
+
     const { retry, outcome } = describeAssistantError(
       this.#consecutiveFailures,
       errorMessage,
@@ -250,15 +266,21 @@ class PiStreamReducer implements StreamReducer {
     } else {
       this.#outcome = outcome;
       this.#phase = "ended";
+      this.#gaveUp = true;
     }
   }
 
-  /** agent_settled：事件流已经彻底安定。结局还没定的话，按最后一个 stopReason 兜底判定。 */
+  /**
+   * agent_settled 不是终点：通道持续报错时 pi 会反复放弃当前一轮、再用 agent_start 开新的一轮
+   * （同一个进程可能发出十几次 agent_settled，见 s06 抓包），所以这里只按最后一个 stopReason
+   * 给一个暂定结局，阶段维持不变——进程很可能还会继续（模块设计 4.5 节第 1 条）。
+   * 唯一的终态是连续失败达到上限（见 #handleAssistantError 里的 #gaveUp）。
+   */
   #finalizeSettled(): void {
-    this.#phase = "ended";
-    if (this.#outcome === null) {
-      this.#outcome = decideSettledOutcome(this.#lastStopReason, this.#lastErrorMessage);
+    if (this.#gaveUp) {
+      return;
     }
+    this.#outcome = decideSettledOutcome(this.#lastStopReason, this.#lastErrorMessage);
   }
 }
 

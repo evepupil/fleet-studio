@@ -57,11 +57,14 @@ export function buildLaunch(input: BuildLaunchInput): LaunchSpec {
   } else {
     args.push("--title", input.title);
   }
-  // 让思考内容出现在事件流里；opencode 不认 thinking 档位，input.thinking 不参与拼参数。
-  args.push("--thinking");
   if (taskFilePath !== null) {
+    // -f 在 opencode 里是数组类型参数：必须紧跟一个开关参数（--thinking）把它终结掉，
+    // 否则排在命令行末尾的任务正文消息会被当成 -f 的又一个附件一起吞掉（D4）。
     args.push("-f", taskFilePath);
   }
+  // 让思考内容出现在事件流里；同时（在走文件的情况下）终结 -f 的数组。
+  // opencode 不认 thinking 档位，input.thinking 不参与拼参数。
+  args.push("--thinking");
   args.push(message);
 
   return { args, files };
