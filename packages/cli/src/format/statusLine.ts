@@ -1,4 +1,4 @@
-import { STATUS_LABELS, type WorkerSummary } from "@fleet/core";
+import { FAIL_REASON_LABELS, STATUS_LABELS, type WorkerSummary } from "@fleet/core";
 import { elapsedMs, formatDuration } from "./duration.js";
 
 type StatusFields = Pick<WorkerSummary, "status" | "queuePosition" | "retry" | "verdict">;
@@ -26,4 +26,26 @@ export function formatStatusLine(worker: WorkerSummary, now: Date): string {
   const status = describeStatus(worker);
   const duration = formatDuration(elapsedMs(worker, now));
   return `${worker.id}  ${status}  ${worker.poolId}/${worker.roleLabel}  ${duration}  ${worker.title}`;
+}
+
+/**
+ * 失败或取消的原因说明（fleet show 用，缺陷 8）：有失败原因就是「<原因中文>：<说明>」；
+ * 已取消通常没有失败原因，这时只写说明；两边都没有时给个占位，不留空行。
+ */
+export function describeFailureReason(
+  worker: Pick<WorkerSummary, "failReason" | "errorMessage">,
+): string {
+  const reasonLabel = worker.failReason !== null ? FAIL_REASON_LABELS[worker.failReason] : null;
+  const message =
+    worker.errorMessage !== null && worker.errorMessage.length > 0 ? worker.errorMessage : null;
+  if (reasonLabel !== null && message !== null) {
+    return `${reasonLabel}：${message}`;
+  }
+  if (reasonLabel !== null) {
+    return reasonLabel;
+  }
+  if (message !== null) {
+    return message;
+  }
+  return "没有更多说明";
 }

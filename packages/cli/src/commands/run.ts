@@ -27,6 +27,7 @@ const RUN_OPTIONS = {
   timeout: { type: "string" },
   "queue-timeout": { type: "string" },
   wait: { type: "boolean" },
+  brief: { type: "boolean" },
 } as const;
 
 const RUN_HELP = `用法：fleet run [任务] [选项]
@@ -45,6 +46,7 @@ const RUN_HELP = `用法：fleet run [任务] [选项]
   --timeout <分钟>            运行超时
   --queue-timeout <分钟|none> 排队超时，none 表示不限时
   --wait                     派完接着等，等同 fleet wait 这一个编号
+  --brief                    只在带 --wait 时生效：不打印回报原文
   --json                     原样输出接口返回的 JSON
   --home <目录>               覆盖数据目录`;
 
@@ -118,7 +120,12 @@ export async function runRunCommand(argv: readonly string[], deps: CommandDeps):
   }
   return waitAndReport(
     [worker.id],
-    { mode: "all", totalTimeoutSec: DEFAULT_WAIT_TOTAL_TIMEOUT_SEC, brief: false, json: wantsJson },
+    {
+      mode: "all",
+      totalTimeoutSec: DEFAULT_WAIT_TOTAL_TIMEOUT_SEC,
+      brief: values.brief === true,
+      json: wantsJson,
+    },
     client,
     deps.io,
     deps.now,

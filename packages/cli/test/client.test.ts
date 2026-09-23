@@ -87,4 +87,33 @@ describe("FleetClient", () => {
     const client = createFleetClient(deadUrl, "token");
     await expect(client.getJson("/api/health")).rejects.toBeInstanceOf(CliConnectionError);
   });
+
+  it("按次指定的超时比服务端响应更早触发时，报中文的请求超时（缺陷 7）", async () => {
+    stub = await startStubServer(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return { status: 200, body: { ok: true } };
+    });
+    const client = createFleetClient(stub.baseUrl, "token");
+
+    let caught: unknown;
+    try {
+      await client.getJson("/api/wait", undefined, { timeoutMs: 1000 });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(CliConnectionError);
+    expect(caught instanceof Error && caught.message).toBe("请求超时（1 秒）：/api/wait");
+    expect(caught instanceof Error && caught.message.includes("aborted")).toBe(false);
+  });
+
+  it("按次指定更长的超时时，即使响应比默认超时还慢也能正常拿到结果（缺陷 7）", async () => {
+    stub = await startStubServer(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return { status: 200, body: { done: [], pending: ["w1"], timedOut: true } };
+    });
+    const client = createFleetClient(stub.baseUrl, "token");
+
+    const result = await client.getJson("/api/wait", undefined, { timeoutMs: 5000 });
+    expect(result).toEqual({ done: [], pending: ["w1"], timedOut: true });
+  });
 });

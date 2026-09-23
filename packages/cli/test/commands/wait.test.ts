@@ -1,10 +1,30 @@
 import { TOKEN_HEADER } from "@fleet/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { runWaitCommand } from "../../src/commands/wait.js";
+import {
+  computePerCallTimeoutSec,
+  computeWaitRequestTimeoutMs,
+  runWaitCommand,
+} from "../../src/commands/wait.js";
 import { CliUsageError, EXIT_CODE } from "../../src/errors.js";
 import { type CommandHarness, createCommandHarness } from "../support/commandHarness.js";
 import { fakeDetail, fakeRun, fakeWorker } from "../support/fixtures.js";
 import { findRequest } from "../support/stubServer.js";
+
+describe("computePerCallTimeoutSec / computeWaitRequestTimeoutMs（缺陷 7 的核心公式）", () => {
+  it("单次 /api/wait 让服务端等待的秒数随剩余预算变化，且封顶 60 秒", () => {
+    expect(computePerCallTimeoutSec(undefined)).toBe(60);
+    expect(computePerCallTimeoutSec(5000)).toBe(5);
+    expect(computePerCallTimeoutSec(200)).toBe(1); // 向上取整且至少 1 秒
+    expect(computePerCallTimeoutSec(120_000)).toBe(60); // 封顶在 WAIT_MAX_SECONDS
+  });
+
+  it("客户端超时留 15 秒余量：timeoutSec 用满 60 秒时也远大于旧的固定 30 秒", () => {
+    expect(computeWaitRequestTimeoutMs(2)).toBe(17_000);
+    expect(computeWaitRequestTimeoutMs(60)).toBe(75_000);
+    // 这正是缺陷 7 的核心：旧实现固定用 30_000ms，服务端按 60 秒长轮询时客户端会先掐断。
+    expect(computeWaitRequestTimeoutMs(60)).toBeGreaterThan(30_000);
+  });
+});
 
 let harness: CommandHarness | undefined;
 
@@ -65,7 +85,28 @@ describe("runWaitCommand", () => {
     expect(waitCallCount).toBe(2);
   });
 
-  it("总超时到了还没结束：退出码 2", async () => {
+  it("总超时到了还没结束：退出码 2，并打印超时汇总和每个没结束苦工的状态行（缺陷 4）", async () => {
+    const workerId = "w7k2mq";
+    const stillRunning = fakeWorker({ id: workerId, status: "running" });
+    harness = await createCommandHarness((request) => {
+      if (request.path === "/api/wait") {
+        return { status: 200, body: { done: [], pending: [workerId], timedOut: true } };
+      }
+      if (request.path === `/api/workers/${workerId}`) {
+        return { status: 200, body: fakeDetail(stillRunning) };
+      }
+      throw new Error(`意外请求：${request.method} ${request.path}`);
+    });
+
+    const exitCode = await runWaitCommand([workerId, "--timeout", "0.3"], harness.deps);
+    expect(exitCode).toBe(EXIT_CODE.timeout);
+    expect(harness.deps.stdoutLines).toContain(`等待超时，还有 1 个苦工没结束：${workerId}`);
+    expect(
+      harness.deps.stdoutLines.some((line) => line.startsWith(workerId) && line.includes("工作中")),
+    ).toBe(true);
+  }, 10000);
+
+  it("超时提示不影响 --json：--json 模式下不额外打印超时汇总文字", async () => {
     const workerId = "w7k2mq";
     harness = await createCommandHarness((request) => {
       if (request.path === "/api/wait") {
@@ -74,8 +115,10 @@ describe("runWaitCommand", () => {
       throw new Error(`意外请求：${request.method} ${request.path}`);
     });
 
-    const exitCode = await runWaitCommand([workerId, "--timeout", "0.3"], harness.deps);
+    const exitCode = await runWaitCommand([workerId, "--timeout", "0.3", "--json"], harness.deps);
     expect(exitCode).toBe(EXIT_CODE.timeout);
+    const parsed = JSON.parse(harness.deps.stdoutLines.join("\n"));
+    expect(parsed).toEqual({ done: [], pending: [workerId], timedOut: true });
   }, 10000);
 
   it("失败的苦工：打印失败原因，退出码 1", async () => {

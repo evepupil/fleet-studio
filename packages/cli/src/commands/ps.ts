@@ -1,4 +1,4 @@
-import { API_PATHS, isTerminalStatus, type WorkerSummary } from "@fleet/core";
+import { API_PATHS, type RunStatus, type WorkerSummary } from "@fleet/core";
 import { COMMON_OPTIONS, parseCommandArgs } from "../args.js";
 import { createFleetClient } from "../client.js";
 import type { CommandDeps } from "../context.js";
@@ -27,19 +27,34 @@ const PS_HELP = `用法：fleet ps [选项]
 /** 标题列超过这个显示宽度就截断，避免长标题把表格撑到没法一屏看完。 */
 const TITLE_MAX_WIDTH = 36;
 
+/** 工作中最靠前，其次排队中，已结束垫底（缺陷 5 修正：三档分别定义组内顺序）。 */
+function statusRank(status: RunStatus): number {
+  if (status === "running") {
+    return 0;
+  }
+  if (status === "queued") {
+    return 1;
+  }
+  return 2;
+}
+
 /**
- * 进行中的在前、已结束的在后（规格 3.4 ps）：组内再各自排序——进行中的按创建时间从早到晚
- * （排队久的更显眼），已结束的按结束时间从早到晚（这样越靠后越是刚结束的，对应「最近结束的在后」）。
+ * 进行中的在前、已结束的在后（规格 3.4 ps）：工作中按开跑时间从早到晚（跑得越久越显眼），
+ * 排队中按排队位置从小到大；已结束按结束时间倒序——最近结束的排在已结束这组的最前面，
+ * 而不是按编号字母序（缺陷 5：原实现把已结束的按结束时间从早到晚排反了）。
  */
 function comparePsRows(a: WorkerSummary, b: WorkerSummary): number {
-  const aActive = !isTerminalStatus(a.status);
-  const bActive = !isTerminalStatus(b.status);
-  if (aActive !== bActive) {
-    return aActive ? -1 : 1;
+  const rankDiff = statusRank(a.status) - statusRank(b.status);
+  if (rankDiff !== 0) {
+    return rankDiff;
   }
-  const aKey = aActive ? a.createdAt : (a.endedAt ?? a.createdAt);
-  const bKey = bActive ? b.createdAt : (b.endedAt ?? b.createdAt);
-  return aKey.localeCompare(bKey);
+  if (a.status === "running") {
+    return (a.startedAt ?? "").localeCompare(b.startedAt ?? "");
+  }
+  if (a.status === "queued") {
+    return (a.queuePosition ?? 0) - (b.queuePosition ?? 0);
+  }
+  return (b.endedAt ?? "").localeCompare(a.endedAt ?? "");
 }
 
 export async function runPsCommand(argv: readonly string[], deps: CommandDeps): Promise<number> {

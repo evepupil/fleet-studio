@@ -73,6 +73,27 @@ describe("runSendCommand", () => {
     expect(harness.deps.stdoutLines.some((line) => line.includes("SUMMARY: 好了"))).toBe(true);
   });
 
+  it("--wait --brief 续接完接着等但不打印回报原文（缺陷 2：send 现在也认 --brief）", async () => {
+    const worker = fakeWorker({ status: "queued", runSeq: 2 });
+    const doneWorker: typeof worker = { ...worker, status: "completed" };
+
+    harness = await createCommandHarness((request) => {
+      if (request.method === "POST" && request.path === `/api/workers/${worker.id}/messages`) {
+        return { status: 200, body: { worker } };
+      }
+      if (request.path === "/api/wait") {
+        return { status: 200, body: { done: [doneWorker], pending: [], timedOut: false } };
+      }
+      throw new Error(`意外请求：${request.method} ${request.path}`);
+    });
+
+    const exitCode = await runSendCommand([worker.id, "继续", "--wait", "--brief"], harness.deps);
+    expect(exitCode).toBe(EXIT_CODE.ok);
+    expect(
+      harness.stub.requests.some((request) => request.path === `/api/workers/${worker.id}`),
+    ).toBe(false);
+  });
+
   it("没有给苦工编号时报用法错误", async () => {
     harness = await createCommandHarness(() => ({ status: 200, body: {} }));
     await expect(runSendCommand([], harness.deps)).rejects.toThrow(CliUsageError);

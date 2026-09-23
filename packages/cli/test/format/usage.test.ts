@@ -17,7 +17,7 @@ describe("formatUsage", () => {
     );
   });
 
-  it("费用未知时不显示费用部分", () => {
+  it("费用未知（null）时不显示费用部分", () => {
     const usage: Usage = {
       inputTokens: 1,
       outputTokens: 2,
@@ -25,6 +25,18 @@ describe("formatUsage", () => {
       cacheWriteTokens: 0,
       totalTokens: 3,
       costUsd: null,
+    };
+    expect(formatUsage(usage)).toBe("输入 1 · 输出 2 · 缓存读 0 · 缓存写 0 · 合计 3");
+  });
+
+  it("费用为 0 时也不显示费用部分（缺陷 6：不该显示成「费用 $0.0000」）", () => {
+    const usage: Usage = {
+      inputTokens: 1,
+      outputTokens: 2,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      totalTokens: 3,
+      costUsd: 0,
     };
     expect(formatUsage(usage)).toBe("输入 1 · 输出 2 · 缓存读 0 · 缓存写 0 · 合计 3");
   });

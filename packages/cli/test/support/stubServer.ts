@@ -14,7 +14,11 @@ export interface StubResponseSpec {
   readonly body?: unknown;
 }
 
-export type StubHandler = (request: RecordedRequest) => StubResponseSpec;
+// 允许返回 Promise：有些测试要模拟「服务端故意拖到很晚才回」（例如长轮询、超时场景），
+// 得在 handler 里自己 await 一个延迟。
+export type StubHandler = (
+  request: RecordedRequest,
+) => StubResponseSpec | Promise<StubResponseSpec>;
 
 export interface StubServer {
   readonly baseUrl: string;
@@ -62,7 +66,7 @@ export async function startStubServer(handler: StubHandler): Promise<StubServer>
       // 排查起来会以为是别的问题（例如误以为服务连不上）。
       let spec: StubResponseSpec;
       try {
-        spec = handler(recorded);
+        spec = await handler(recorded);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         spec = { status: 500, body: { error: { code: "internal", message } } };

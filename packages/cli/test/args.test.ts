@@ -21,16 +21,39 @@ describe("parseCommandArgs", () => {
     expect(positionals).toEqual(["写代码", "修 bug"]);
   });
 
-  it("遇到未知选项时抛出 CliUsageError 而不是原始异常", () => {
-    expect(() =>
-      parseCommandArgs({ args: ["--not-a-real-option"], options: { ...COMMON_OPTIONS } }),
-    ).toThrow(CliUsageError);
+  it("未知选项报中文错误，不透出 Node 的英文原话（缺陷 3）", () => {
+    expect(() => parseCommandArgs({ args: ["--brief"], options: { ...COMMON_OPTIONS } })).toThrow(
+      "不认识的选项：--brief。用 fleet <子命令> --help 查看用法",
+    );
   });
 
-  it("不允许位置参数时给出的位置参数会报用法错误", () => {
+  it("选项缺值时报中文错误，带上选项名和查看用法的提示（缺陷 3）", () => {
+    expect(() => parseCommandArgs({ args: ["--home"], options: { ...COMMON_OPTIONS } })).toThrow(
+      "选项 --home 的取值不对。用 fleet <子命令> --help 查看用法",
+    );
+  });
+
+  it("布尔选项被塞了取值时也报「取值不对」（缺陷 3）", () => {
+    expect(() => parseCommandArgs({ args: ["--json=1"], options: { ...COMMON_OPTIONS } })).toThrow(
+      "选项 --json 的取值不对。用 fleet <子命令> --help 查看用法",
+    );
+  });
+
+  it("不允许位置参数时给出的位置参数会报中文用法错误", () => {
     expect(() =>
       parseCommandArgs({ args: ["多余的参数"], options: { ...COMMON_OPTIONS } }),
-    ).toThrow(CliUsageError);
+    ).toThrow("参数不对。用 fleet <子命令> --help 查看用法");
+  });
+
+  it("翻译后的错误信息里不应该出现 Node 的英文原句片段", () => {
+    try {
+      parseCommandArgs({ args: ["--brief"], options: { ...COMMON_OPTIONS } });
+      throw new Error("应该抛出异常");
+    } catch (error) {
+      expect(error instanceof CliUsageError && error.message.includes("positional argument")).toBe(
+        false,
+      );
+    }
   });
 });
 

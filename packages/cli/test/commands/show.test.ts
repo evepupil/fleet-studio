@@ -43,6 +43,58 @@ describe("runShowCommand", () => {
     expect(output).toContain("做完了");
   });
 
+  it("失败时在状态下一行打印原因（缺陷 8）", async () => {
+    const worker = fakeWorker({
+      status: "failed",
+      failReason: "timeout",
+      errorMessage: "运行超过 5 分钟被结束",
+    });
+    const detail = fakeDetail(worker, [
+      fakeRun({ status: "failed", report: null, finalText: null }),
+    ]);
+    harness = await createCommandHarness(() => ({ status: 200, body: detail }));
+
+    await runShowCommand([worker.id], harness.deps);
+    const lines = harness.deps.stdoutLines;
+    const statusIndex = lines.findIndex((line) => line.startsWith("状态："));
+    expect(lines[statusIndex + 1]).toBe("原因：运行超时：运行超过 5 分钟被结束");
+  });
+
+  it("已取消且没有失败原因时，原因这一行只写说明", async () => {
+    const worker = fakeWorker({ status: "cancelled", failReason: null, errorMessage: "用户取消" });
+    const detail = fakeDetail(worker, [
+      fakeRun({ status: "cancelled", report: null, finalText: null }),
+    ]);
+    harness = await createCommandHarness(() => ({ status: 200, body: detail }));
+
+    await runShowCommand([worker.id], harness.deps);
+    const lines = harness.deps.stdoutLines;
+    const statusIndex = lines.findIndex((line) => line.startsWith("状态："));
+    expect(lines[statusIndex + 1]).toBe("原因：用户取消");
+  });
+
+  it("正常完成时不打印原因这一行", async () => {
+    const worker = fakeWorker({ status: "completed" });
+    const detail = fakeDetail(worker);
+    harness = await createCommandHarness(() => ({ status: 200, body: detail }));
+
+    await runShowCommand([worker.id], harness.deps);
+    expect(harness.deps.stdoutLines.some((line) => line.startsWith("原因："))).toBe(false);
+  });
+
+  it("没有回报（还在跑、或失败没留下回报）时最新回报统一写占位文字（缺陷 8）", async () => {
+    const runningWorker = fakeWorker({ status: "running" });
+    const detail = fakeDetail(runningWorker, [
+      fakeRun({ status: "running", report: null, finalText: null }),
+    ]);
+    harness = await createCommandHarness(() => ({ status: 200, body: detail }));
+
+    await runShowCommand([runningWorker.id], harness.deps);
+    const lines = harness.deps.stdoutLines;
+    const reportIndex = lines.indexOf("最新回报：");
+    expect(lines[reportIndex + 1]).toBe("（暂无回报）");
+  });
+
   it("--json 原样输出接口返回的 WorkerDetail", async () => {
     const worker = fakeWorker();
     const detail = fakeDetail(worker);

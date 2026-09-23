@@ -123,6 +123,9 @@ function isDirectlyExecuted(): boolean {
 }
 
 if (isDirectlyExecuted()) {
-  const exitCode = await runFleetCli(process.argv.slice(2));
-  process.exit(exitCode);
+  // 用 process.exitCode 而不是 process.exit()：process.exit() 会立刻强制结束进程，
+  // 这时候上一次 fetch 请求的连接可能还没关完，Windows 上会撞上 libuv 的断言
+  // （Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)），表现为退出码变成 127，
+  // 主会话会把这个误判成失败。只设置退出码，让 Node 自己按事件循环空了再退出。
+  process.exitCode = await runFleetCli(process.argv.slice(2));
 }

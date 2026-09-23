@@ -80,15 +80,20 @@ function describeNetworkError(error: unknown): string {
   return error instanceof Error ? error.message : "未知网络错误";
 }
 
+/** 单次请求可以覆盖默认超时；/api/wait 这种长轮询接口每次调用需要的时限不一样。 */
+export interface RequestOptions {
+  readonly timeoutMs?: number;
+}
+
 export interface FleetClient {
   /** 不带令牌的 GET；query 里 undefined 的字段会被跳过。 */
-  getJson<T>(path: string, query?: QueryParams): Promise<T>;
+  getJson<T>(path: string, query?: QueryParams, options?: RequestOptions): Promise<T>;
   /** 带令牌的 POST，请求体按 JSON 发送。 */
-  postJson<T>(path: string, body: unknown): Promise<T>;
+  postJson<T>(path: string, body: unknown, options?: RequestOptions): Promise<T>;
   /** 带令牌的 PATCH，请求体按 JSON 发送。 */
-  patchJson<T>(path: string, body: unknown): Promise<T>;
+  patchJson<T>(path: string, body: unknown, options?: RequestOptions): Promise<T>;
   /** 带令牌但没有请求体的 POST（取消、关停）。 */
-  postEmpty<T>(path: string): Promise<T>;
+  postEmpty<T>(path: string, options?: RequestOptions): Promise<T>;
 }
 
 interface RequestSpec {
@@ -100,10 +105,15 @@ interface RequestSpec {
   readonly query?: QueryParams | undefined;
   readonly body?: unknown;
   readonly withToken: boolean;
+  readonly timeoutMs?: number | undefined;
 }
 
-/** 服务只在本机监听，握手和响应都很快；给个宽松但有限的超时，避免命令挂死。 */
-const REQUEST_TIMEOUT_MS = 30_000;
+/**
+ * 服务只在本机监听，握手和响应都很快；给个宽松但有限的超时，避免命令挂死。
+ * /api/wait 是例外：它是长轮询，服务端会按请求带的 timeoutSec（最多 60 秒）挂住才回，
+ * 调用方（wait.ts）会按那个秒数单独算一个更长的超时传进来，不用这个默认值。
+ */
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
 export function createFleetClient(baseUrl: string, token: string): FleetClient {
   async function request<T>(spec: RequestSpec): Promise<T> {
@@ -116,8 +126,15 @@ export function createFleetClient(baseUrl: string, token: string): FleetClient {
       headers[TOKEN_HEADER] = token;
     }
 
+    const timeoutMs = spec.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    // 记一下是不是我们自己的定时器把请求掐断的：fetch 失败还可能是连接被拒绝、DNS 解析
+    // 失败等别的原因，只有真的是我们主动 abort 的那次，才应该报「请求超时」而不是「连不上服务」。
+    let timedOutByUs = false;
+    const timer = setTimeout(() => {
+      timedOutByUs = true;
+      controller.abort();
+    }, timeoutMs);
     // RequestInit.body 的类型不包含 undefined：没有请求体时整个键都不传，
     // 而不是传 body: undefined（exactOptionalPropertyTypes 下两者不等价）。
     const init: RequestInit = {
@@ -130,6 +147,11 @@ export function createFleetClient(baseUrl: string, token: string): FleetClient {
     try {
       response = await fetch(url, init);
     } catch (error) {
+      if (timedOutByUs) {
+        throw new CliConnectionError(
+          `请求超时（${Math.round(timeoutMs / 1000)} 秒）：${spec.path}`,
+        );
+      }
       throw new CliConnectionError(`连不上服务：${describeNetworkError(error)}`);
     } finally {
       clearTimeout(timer);
@@ -143,17 +165,35 @@ export function createFleetClient(baseUrl: string, token: string): FleetClient {
   }
 
   return {
-    getJson<T>(path: string, query?: QueryParams): Promise<T> {
-      return request<T>({ method: "GET", path, query, withToken: false });
+    getJson<T>(path: string, query?: QueryParams, options?: RequestOptions): Promise<T> {
+      return request<T>({
+        method: "GET",
+        path,
+        query,
+        withToken: false,
+        timeoutMs: options?.timeoutMs,
+      });
     },
-    postJson<T>(path: string, body: unknown): Promise<T> {
-      return request<T>({ method: "POST", path, body, withToken: true });
+    postJson<T>(path: string, body: unknown, options?: RequestOptions): Promise<T> {
+      return request<T>({
+        method: "POST",
+        path,
+        body,
+        withToken: true,
+        timeoutMs: options?.timeoutMs,
+      });
     },
-    patchJson<T>(path: string, body: unknown): Promise<T> {
-      return request<T>({ method: "PATCH", path, body, withToken: true });
+    patchJson<T>(path: string, body: unknown, options?: RequestOptions): Promise<T> {
+      return request<T>({
+        method: "PATCH",
+        path,
+        body,
+        withToken: true,
+        timeoutMs: options?.timeoutMs,
+      });
     },
-    postEmpty<T>(path: string): Promise<T> {
-      return request<T>({ method: "POST", path, withToken: true });
+    postEmpty<T>(path: string, options?: RequestOptions): Promise<T> {
+      return request<T>({ method: "POST", path, withToken: true, timeoutMs: options?.timeoutMs });
     },
   };
 }

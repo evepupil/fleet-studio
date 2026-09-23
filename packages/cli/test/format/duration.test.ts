@@ -7,12 +7,13 @@ describe("formatDuration", () => {
     expect(formatDuration(0)).toBe("0秒");
   });
 
-  it("刚好 1 分钟进入分秒格式", () => {
-    expect(formatDuration(60_000)).toBe("1分0秒");
+  it("刚好 1 分钟进入分秒格式，秒数补零到两位", () => {
+    expect(formatDuration(60_000)).toBe("1分00秒");
   });
 
-  it("不足 1 小时显示分秒", () => {
+  it("不足 1 小时显示分秒，秒数补零到两位（缺陷 9：与看板 formatDuration 对齐）", () => {
     expect(formatDuration(3 * 60_000 + 12_000)).toBe("3分12秒");
+    expect(formatDuration(5 * 60_000 + 7_000)).toBe("5分07秒");
   });
 
   it("1 小时及以上显示时分，分钟补零到两位", () => {

@@ -53,11 +53,23 @@ function parseNonNegativeSeconds(raw: string, flagName: string): number {
 }
 
 /** 单次 /api/wait 最多挂 WAIT_MAX_SECONDS 秒；不超过命令自己剩余的总预算。 */
-function computePerCallTimeoutSec(remainingBudgetMs: number | undefined): number {
+export function computePerCallTimeoutSec(remainingBudgetMs: number | undefined): number {
   if (remainingBudgetMs === undefined) {
     return WAIT_MAX_SECONDS;
   }
   return Math.max(1, Math.min(WAIT_MAX_SECONDS, Math.ceil(remainingBudgetMs / 1000)));
+}
+
+/**
+ * 客户端请求超时要比服务端承诺挂住的时间长，否则服务端还没来得及按 timeoutSec 回应，
+ * 客户端自己先把连接掐断了（表现为「连不上服务：This operation was aborted」，缺陷 7）。
+ * 留 15 秒余量给网络往返和服务端处理；导出这个函数是为了能直接用小数值单测这条公式，
+ * 不用真的等 timeoutSec 跑到接近一分钟。
+ */
+export const WAIT_REQUEST_TIMEOUT_BUFFER_MS = 15_000;
+
+export function computeWaitRequestTimeoutMs(timeoutSec: number): number {
+  return timeoutSec * 1000 + WAIT_REQUEST_TIMEOUT_BUFFER_MS;
 }
 
 function describeFailure(worker: WorkerSummary): string {
@@ -88,6 +100,27 @@ async function reportWorkerOutcome(
 }
 
 /**
+ * 总超时到了但还有苦工没结束：打一行汇总，再逐个把还没结束的苦工的状态行打出来，
+ * 不然主会话只看到退出码 2，不知道具体是谁没完成（缺陷 4）。
+ */
+async function reportTimeoutPending(
+  pendingIds: readonly string[],
+  client: FleetClient,
+  io: CliIo,
+  now: Date,
+): Promise<void> {
+  io.stdout(`等待超时，还有 ${pendingIds.length} 个苦工没结束：${pendingIds.join("、")}`);
+  for (const id of pendingIds) {
+    try {
+      const detail = await client.getJson<WorkerDetail>(API_PATHS.worker(id));
+      io.stdout(formatStatusLine(detail.summary, now));
+    } catch {
+      // 取不到详情（例如恰好这期间苦工被清理掉了）不影响超时提示本身，跳过继续下一个。
+    }
+  }
+}
+
+/**
  * 循环调用 /api/wait 直到给定的苦工都结束（或 mode 是 any 时有一个结束）或总超时。
  * run --wait、send --wait 复用的就是这个函数：跟单独执行 fleet wait <这一个编号> 是同一段代码。
  */
@@ -110,11 +143,12 @@ export async function waitAndReport(
       break;
     }
 
-    const result = await client.getJson<WaitResult>(API_PATHS.wait, {
-      ids: [...remainingIds].join(","),
-      mode: options.mode,
-      timeoutSec: computePerCallTimeoutSec(remainingBudgetMs),
-    });
+    const timeoutSec = computePerCallTimeoutSec(remainingBudgetMs);
+    const result = await client.getJson<WaitResult>(
+      API_PATHS.wait,
+      { ids: [...remainingIds].join(","), mode: options.mode, timeoutSec },
+      { timeoutMs: computeWaitRequestTimeoutMs(timeoutSec) },
+    );
 
     for (const worker of result.done) {
       remainingIds.delete(worker.id);
@@ -127,6 +161,10 @@ export async function waitAndReport(
     if (options.mode === "any" && result.done.length > 0) {
       break;
     }
+  }
+
+  if (timedOut && !options.json) {
+    await reportTimeoutPending([...remainingIds], client, io, now());
   }
 
   if (options.json) {

@@ -1,6 +1,10 @@
 import { type WorkerSummary, ZERO_USAGE } from "@fleet/core";
 import { describe, expect, it } from "vitest";
-import { describeStatus, formatStatusLine } from "../../src/format/statusLine.js";
+import {
+  describeFailureReason,
+  describeStatus,
+  formatStatusLine,
+} from "../../src/format/statusLine.js";
 
 function baseWorker(overrides: Partial<WorkerSummary>): WorkerSummary {
   return {
@@ -58,6 +62,26 @@ describe("describeStatus", () => {
   it("普通工作中不附加任何说明", () => {
     const worker = baseWorker({ status: "running" });
     expect(describeStatus(worker)).toBe("工作中");
+  });
+});
+
+describe("describeFailureReason", () => {
+  it("有失败原因和说明时拼成「原因：说明」", () => {
+    expect(
+      describeFailureReason({ failReason: "timeout", errorMessage: "运行超过 5 分钟被结束" }),
+    ).toBe("运行超时：运行超过 5 分钟被结束");
+  });
+
+  it("有失败原因但没有说明时只写原因", () => {
+    expect(describeFailureReason({ failReason: "timeout", errorMessage: null })).toBe("运行超时");
+  });
+
+  it("没有失败原因但有说明时只写说明（典型的已取消）", () => {
+    expect(describeFailureReason({ failReason: null, errorMessage: "用户取消" })).toBe("用户取消");
+  });
+
+  it("两边都没有时给占位说明，不留空", () => {
+    expect(describeFailureReason({ failReason: null, errorMessage: null })).toBe("没有更多说明");
   });
 });
 

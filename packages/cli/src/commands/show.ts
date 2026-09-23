@@ -6,7 +6,7 @@ import { ensureDaemon } from "../daemon/discover.js";
 import { CliUsageError, EXIT_CODE } from "../errors.js";
 import { elapsedMs, formatDuration } from "../format/duration.js";
 import { formatReportSections } from "../format/report.js";
-import { describeStatus } from "../format/statusLine.js";
+import { describeFailureReason, describeStatus } from "../format/statusLine.js";
 import { formatUsage } from "../format/usage.js";
 import { resolveHome } from "../home.js";
 
@@ -56,6 +56,9 @@ export async function runShowCommand(argv: readonly string[], deps: CommandDeps)
 
   deps.io.stdout(`标题：${summary.title}`);
   deps.io.stdout(`状态：${describeStatus(summary)}`);
+  if (summary.status === "failed" || summary.status === "cancelled") {
+    deps.io.stdout(`原因：${describeFailureReason(summary)}`);
+  }
   deps.io.stdout(`项目目录：${detail.projectPath}`);
   deps.io.stdout(`工作目录：${summary.cwd}`);
   deps.io.stdout(`角色：${summary.roleLabel}`);

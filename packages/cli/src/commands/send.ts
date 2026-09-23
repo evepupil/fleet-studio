@@ -13,6 +13,7 @@ const SEND_OPTIONS = {
   "prompt-file": { type: "string" },
   timeout: { type: "string" },
   wait: { type: "boolean" },
+  brief: { type: "boolean" },
 } as const;
 
 const SEND_HELP = `用法：fleet send <编号> [追加指令] [选项]
@@ -23,6 +24,7 @@ const SEND_HELP = `用法：fleet send <编号> [追加指令] [选项]
 选项：
   --timeout <分钟>  这次运行的超时
   --wait           发完接着等，等同 fleet wait 这一个编号
+  --brief          只在带 --wait 时生效：不打印回报原文
   --json           原样输出接口返回的 JSON
   --home <目录>     覆盖数据目录`;
 
@@ -70,7 +72,12 @@ export async function runSendCommand(argv: readonly string[], deps: CommandDeps)
   }
   return waitAndReport(
     [worker.id],
-    { mode: "all", totalTimeoutSec: DEFAULT_WAIT_TOTAL_TIMEOUT_SEC, brief: false, json: wantsJson },
+    {
+      mode: "all",
+      totalTimeoutSec: DEFAULT_WAIT_TOTAL_TIMEOUT_SEC,
+      brief: values.brief === true,
+      json: wantsJson,
+    },
     client,
     deps.io,
     deps.now,

@@ -166,4 +166,26 @@ describe("runRunCommand", () => {
     expect(harness.deps.stdoutLines.some((line) => line.includes("已完成"))).toBe(true);
     expect(harness.deps.stdoutLines.some((line) => line.includes("SUMMARY: 完成了"))).toBe(true);
   });
+
+  it("--wait --brief 派完接着等但不打印回报原文（缺陷 2：run 现在也认 --brief）", async () => {
+    const queuedWorker = fakeWorker({ status: "queued" });
+    const doneWorker = fakeWorker({ status: "completed", queuePosition: null });
+
+    harness = await createCommandHarness((request) => {
+      if (request.method === "POST" && request.path === "/api/workers") {
+        return { status: 201, body: { worker: queuedWorker } };
+      }
+      if (request.path === "/api/wait") {
+        return { status: 200, body: { done: [doneWorker], pending: [], timedOut: false } };
+      }
+      // 没有 /api/workers/:id 这一条：--brief 应该跳过取详情，命中这里说明没生效。
+      throw new Error(`意外的请求：${request.method} ${request.path}`);
+    });
+
+    const exitCode = await runRunCommand(["写代码", "--wait", "--brief"], harness.deps);
+    expect(exitCode).toBe(EXIT_CODE.ok);
+    expect(
+      harness.stub.requests.some((request) => request.path === `/api/workers/${doneWorker.id}`),
+    ).toBe(false);
+  });
 });

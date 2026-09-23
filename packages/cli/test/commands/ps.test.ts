@@ -58,6 +58,43 @@ describe("runPsCommand", () => {
     expect(lines[completedLineIndex]).toContain("已完成");
   });
 
+  it("排序规则（缺陷 5）：工作中按开跑时间、排队中按位置、已结束按结束时间倒序排在已结束组最前面", async () => {
+    const runningLate = fakeWorker({
+      id: "aaaaa1",
+      status: "running",
+      startedAt: "2026-09-23T09:58:00.000Z",
+    });
+    const runningEarly = fakeWorker({
+      id: "aaaaa2",
+      status: "running",
+      startedAt: "2026-09-23T09:50:00.000Z",
+    });
+    const queuedThird = fakeWorker({ id: "qqqqq1", status: "queued", queuePosition: 3 });
+    const queuedFirst = fakeWorker({ id: "qqqqq2", status: "queued", queuePosition: 1 });
+    // 故意用字母序和结束时间相反的编号，复现「原来按编号字母序排列」的缺陷现象。
+    const endedOldest = fakeWorker({
+      id: "w2uevt",
+      status: "completed",
+      endedAt: "2026-09-23T08:00:00.000Z",
+    });
+    const endedNewest = fakeWorker({
+      id: "wvw634",
+      status: "completed",
+      endedAt: "2026-09-23T09:59:00.000Z",
+    });
+    harness = await createCommandHarness(() => ({
+      status: 200,
+      body: [endedOldest, queuedThird, runningLate, endedNewest, runningEarly, queuedFirst],
+    }));
+
+    await runPsCommand(["--all"], harness.deps);
+    const ids = harness.deps.stdoutLines
+      .map((line) => /^(\S+)/.exec(line)?.[1])
+      .filter((id): id is string => id !== undefined && id !== "编号");
+
+    expect(ids).toEqual(["aaaaa2", "aaaaa1", "qqqqq2", "qqqqq1", "wvw634", "w2uevt"]);
+  });
+
   it("--json 原样输出接口返回的 JSON 数组", async () => {
     const worker = fakeWorker();
     harness = await createCommandHarness(() => ({ status: 200, body: [worker] }));
