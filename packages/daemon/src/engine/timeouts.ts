@@ -1,5 +1,6 @@
 import { findExpired, isTerminalStatus, type TimedRun } from "@fleet/core";
 import { finishRun } from "./finisher.js";
+import { identityOfRun } from "./identity.js";
 import type { EngineContext } from "./types.js";
 
 /** queue_timeout 的说明文字里「N 分钟」不足 1 分钟也要显示成 1，不能显示 0 分钟。 */
@@ -54,7 +55,7 @@ async function handleExpired(
       return;
     }
     ctx.deps.repos.runs.update(run.id, { killedBy: "timeout" });
-    await ctx.deps.host.kill(run.pid);
+    await ctx.deps.host.kill(run.pid, identityOfRun(run));
     return;
   }
 

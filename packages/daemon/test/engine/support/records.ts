@@ -47,6 +47,7 @@ export function createRunRecord(overrides: Partial<RunRecord> = {}): RunRecord {
     queueTimeoutMs: null,
     pid: null,
     processImage: null,
+    spawnedAt: null,
     exitCode: null,
     killedBy: null,
     usage: ZERO_USAGE,

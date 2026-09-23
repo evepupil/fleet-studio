@@ -12,7 +12,12 @@ import type {
   WorkerRecord,
 } from "@fleet/core";
 import type { ConfigStore, DaemonPaths, Logger } from "../app/types.js";
-import type { OutputTailer, ProcessExitInfo, ProcessHost } from "../process/types.js";
+import type {
+  OutputTailer,
+  ProcessExitInfo,
+  ProcessHost,
+  ProcessIdentity,
+} from "../process/types.js";
 import type { Repos } from "../store/types.js";
 import type { FleetService, ServiceEvent, WaitMode } from "./service.js";
 
@@ -154,4 +159,4 @@ export interface ResolveAndFinishInput {
   exit: ProcessExit;
 }
 
-export type { OutputTailer, ProcessExit, ProcessExitInfo, StreamReducer };
+export type { OutputTailer, ProcessExit, ProcessExitInfo, ProcessIdentity, StreamReducer };

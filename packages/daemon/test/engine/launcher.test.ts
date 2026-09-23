@@ -97,7 +97,7 @@ describe("launchRun：把一次运行真正拉起来（模块设计 3.5）", () 
     expect(updated?.failReason).toBe("spawn_error");
   });
 
-  it("成功启动：写 pid/processImage，登记跟踪器，发 worker 事件", async () => {
+  it("成功启动：写 pid/processImage/spawnedAt，登记跟踪器，发 worker 事件", async () => {
     const { worker, run } = await seedRunningRun(engine);
     let sawWorkerEvent = false;
     engine.ctx.events.subscribe((event) => {
@@ -111,6 +111,8 @@ describe("launchRun：把一次运行真正拉起来（模块设计 3.5）", () 
     const updated = engine.repos.runs.get(run.id);
     expect(updated?.pid).not.toBeNull();
     expect(updated?.processImage).not.toBeNull();
+    // 评审新任务：拿到进程号那一刻就要把 spawnedAt 一起写进库，供之后核对进程身份用。
+    expect(updated?.spawnedAt).toBe(new Date(engine.ctx.now()).toISOString());
     expect(engine.ctx.trackers.has(run.id)).toBe(true);
     expect(sawWorkerEvent).toBe(true);
   });
@@ -143,6 +145,9 @@ describe("launchRun：把一次运行真正拉起来（模块设计 3.5）", () 
     expect(pid).not.toBeNull();
     if (pid !== null) {
       await waitFor(() => engine.host.killedPids.includes(pid));
+      // 这个进程号是刚刚才拿到手的，不可能被系统复用过，不用核对身份（传 null）。
+      const killCall = engine.host.killCalls.find((call) => call.pid === pid);
+      expect(killCall?.identity).toBeNull();
     }
   });
 
@@ -209,5 +214,8 @@ describe("launchRun：把一次运行真正拉起来（模块设计 3.5）", () 
       throw new Error("迟到的 spawn 应该已经完成");
     }
     await waitFor(() => engine.host.killedPids.includes(lateSpawn.pid));
+    // 同样是刚拿到手的进程号，不用核对身份。
+    const killCall = engine.host.killCalls.find((call) => call.pid === lateSpawn.pid);
+    expect(killCall?.identity).toBeNull();
   });
 });

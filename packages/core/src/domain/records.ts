@@ -64,6 +64,12 @@ export interface RunRecord {
   pid: number | null;
   /** 启动时记录的进程映像名，例如 node.exe，接管时用来核对进程号有没有被复用 */
   processImage: string | null;
+  /**
+   * 拿到进程号的时刻（spawn 返回之后立刻记）。真正的苦工进程创建时间一定不晚于它；
+   * 结束和探测进程前，用它和映像名一起核对「这个进程号现在还是不是当初那个进程」——
+   * 进程号会被系统很快复用，只看映像名挡不住同样是 node.exe 的无关进程
+   */
+  spawnedAt: string | null;
   exitCode: number | null;
   killedBy: KilledBy;
   usage: Usage;

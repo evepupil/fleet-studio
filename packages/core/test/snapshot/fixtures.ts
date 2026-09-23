@@ -87,6 +87,7 @@ export function makeRun(overrides: Partial<RunRecord> = {}): RunRecord {
     queueTimeoutMs: null,
     pid: 1234,
     processImage: "node.exe",
+    spawnedAt: "2026-09-23T00:01:00.000Z",
     exitCode: null,
     killedBy: null,
     usage: { ...ZERO_USAGE },

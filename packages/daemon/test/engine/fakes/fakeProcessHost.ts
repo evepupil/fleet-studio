@@ -8,10 +8,17 @@ import type { RuntimeId } from "@fleet/core";
 import type {
   ProcessExitInfo,
   ProcessHost,
+  ProcessIdentity,
   ResolvedCommand,
   SpawnedProcess,
   SpawnRequest,
 } from "../../../src/process/types.js";
+
+/** 一次 kill 或 isAlive 调用收到的身份，供引擎单测断言「带的身份对不对」。 */
+export interface RecordedIdentityCall {
+  pid: number;
+  identity: ProcessIdentity | null;
+}
 
 export interface FakeSpawnedProcessInfo {
   pid: number;
@@ -33,6 +40,10 @@ export interface FakeProcessHostOptions {
 export interface FakeProcessHost extends ProcessHost {
   readonly spawnedProcesses: readonly FakeSpawnedProcessInfo[];
   readonly killedPids: readonly number[];
+  /** 每次 kill 收到的 (pid, identity)，按调用顺序排列。 */
+  readonly killCalls: readonly RecordedIdentityCall[];
+  /** 每次 isAlive 收到的 (pid, identity)，按调用顺序排列。 */
+  readonly isAliveCalls: readonly RecordedIdentityCall[];
   readonly invalidateCallCount: number;
   /** 手动触发某个 pid 的退出：调用它注册的 onExit 回调（只会真正生效一次）。 */
   triggerExit(pid: number, exit: ProcessExitInfo): void;
@@ -46,6 +57,12 @@ export interface FakeProcessHost extends ProcessHost {
   hangNextResolve(): void;
   /** 让下一次 spawn() 卡住，直到测试调用返回的 release()——用于测试「超时之后才迟到启动成功」。 */
   hangNextSpawn(): { release(): void };
+  /**
+   * 让接下来的 isAlive 调用全部卡住，直到测试调用返回的 release()——用于断言
+   * 「recovery 是先把全部存活探测并发发出去，再逐条处理结果」（调用会先记进
+   * isAliveCalls 再卡住，release 之前就能看到全部调用已经发出）。
+   */
+  pauseIsAlive(): { release(): void };
 }
 
 interface Entry {
@@ -64,7 +81,10 @@ export function createFakeProcessHost(options: FakeProcessHostOptions = {}): Fak
   let pendingResolveError: Error | null = null;
   let resolveHangs = false;
   let pendingSpawnGate: Promise<void> | null = null;
+  let isAliveGate: Promise<void> | null = null;
   const killedPids: number[] = [];
+  const killCalls: RecordedIdentityCall[] = [];
+  const isAliveCalls: RecordedIdentityCall[] = [];
   const spawned = new Map<number, FakeSpawnedProcessInfo>();
   const entries = new Map<number, Entry>();
 
@@ -97,6 +117,8 @@ export function createFakeProcessHost(options: FakeProcessHostOptions = {}): Fak
       return [...spawned.values()];
     },
     killedPids,
+    killCalls,
+    isAliveCalls,
     get invalidateCallCount(): number {
       return invalidateCallCount;
     },
@@ -161,8 +183,9 @@ export function createFakeProcessHost(options: FakeProcessHostOptions = {}): Fak
       };
     },
 
-    async kill(pid: number): Promise<void> {
+    async kill(pid: number, identity: ProcessIdentity | null): Promise<void> {
       killedPids.push(pid);
+      killCalls.push({ pid, identity });
       if (autoExitOnKill) {
         triggerExit(pid, { code: null, signal: "SIGKILL" });
       }
@@ -172,9 +195,10 @@ export function createFakeProcessHost(options: FakeProcessHostOptions = {}): Fak
       }
     },
 
-    async isAlive(pid: number, imageParam: string | null): Promise<boolean> {
-      if (imageParam !== null && imageParam.toLowerCase() !== image.toLowerCase()) {
-        return false;
+    async isAlive(pid: number, identity: ProcessIdentity | null): Promise<boolean> {
+      isAliveCalls.push({ pid, identity }); // 先记调用，卡住也不影响「已经发出去了」这件事
+      if (isAliveGate !== null) {
+        await isAliveGate;
       }
       return entryOf(pid).alive;
     },
@@ -221,6 +245,19 @@ export function createFakeProcessHost(options: FakeProcessHostOptions = {}): Fak
       return {
         release(): void {
           releaseFn();
+        },
+      };
+    },
+
+    pauseIsAlive(): { release(): void } {
+      let releaseFn: () => void = () => {};
+      isAliveGate = new Promise<void>((resolve) => {
+        releaseFn = resolve;
+      });
+      return {
+        release(): void {
+          releaseFn();
+          isAliveGate = null;
         },
       };
     },

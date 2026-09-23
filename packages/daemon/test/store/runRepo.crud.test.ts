@@ -43,6 +43,19 @@ describe("runRepo：get / insert / update", () => {
     expect(runs.get("w1.1")).toEqual(run);
   });
 
+  it("insert：spawnedAt 非 null 时正确往返（拿到进程号的时刻）", () => {
+    const { runs } = setup();
+    const run = createRunRecord({
+      id: "w1.1",
+      workerId: "w1",
+      pid: 4321,
+      processImage: "node.exe",
+      spawnedAt: "2026-01-01T00:00:30.000Z",
+    });
+    runs.insert(run);
+    expect(runs.get("w1.1")).toEqual(run);
+  });
+
   it("insert：costUsd 为 null、retry 为 null 时也能正确往返", () => {
     const { runs } = setup();
     const run = createRunRecord({ id: "w1.1", workerId: "w1", usage: ZERO_USAGE, retry: null });
@@ -76,6 +89,20 @@ describe("runRepo：get / insert / update", () => {
       expect(updated?.processImage).toBe("node.exe");
       expect(updated?.prompt).toBe("任务内容");
       expect(updated?.queuedAt).toBe("2026-01-01T00:00:00.000Z");
+    });
+
+    it("拿到进程号：pid / processImage / spawnedAt 一次写入，spawnedAt 往返一致", () => {
+      const { runs } = setup();
+      runs.insert(createRunRecord({ id: "w1.1", workerId: "w1", status: "running" }));
+      runs.update("w1.1", {
+        pid: 4321,
+        processImage: "node.exe",
+        spawnedAt: "2026-01-01T00:01:00.500Z",
+      });
+      const updated = runs.get("w1.1");
+      expect(updated?.pid).toBe(4321);
+      expect(updated?.processImage).toBe("node.exe");
+      expect(updated?.spawnedAt).toBe("2026-01-01T00:01:00.500Z");
     });
 
     it("失败收尾：failReason / errorMessage / endedAt / exitCode 一起改", () => {

@@ -59,6 +59,11 @@ const MIGRATIONS: readonly string[] = [
   CREATE INDEX idx_runs_ended ON runs(ended_at);
   CREATE INDEX idx_runs_started ON runs(started_at);
   `,
+  // 版本 2（2026-09-24）：运行拿到进程号的时刻，核对进程号有没有被系统复用要用到
+  // （见 docs/模块设计/服务层-进程托管.md 3.5）。旧库升级后已有的运行这一列是 null。
+  `
+  ALTER TABLE runs ADD COLUMN spawned_at TEXT;
+  `,
 ];
 
 /**

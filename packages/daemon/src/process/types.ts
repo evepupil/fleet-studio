@@ -41,15 +41,30 @@ export interface SpawnedProcess {
   onExit(listener: (exit: ProcessExitInfo) => void): void;
 }
 
+/**
+ * 核对「这个进程号现在还是不是当初启动的那个进程」用的身份信息。
+ * 进程号会被系统很快复用给新进程，认错的后果是把无关进程连同子进程树一起结束
+ * （模块设计：服务层-进程托管 3.5）。
+ */
+export interface ProcessIdentity {
+  /** 启动时记录的映像名，例如 node.exe；null 表示不核对 */
+  image: string | null;
+  /** 拿到进程号的时刻（Unix 毫秒），真正的进程创建时间一定不晚于它；null 表示不核对（旧记录没有） */
+  spawnedAtMs: number | null;
+}
+
 export interface ProcessHost {
   /** 找到运行时的可执行文件；找不到抛 FleetError("runtime_unavailable") */
   resolve(runtime: RuntimeId): Promise<ResolvedCommand>;
   /** 分离启动苦工进程，输出直接写文件；启动失败抛 FleetError("invalid_request" 或 "runtime_unavailable") */
   spawn(request: SpawnRequest): Promise<SpawnedProcess>;
-  /** 结束整棵进程树；进程已不存在时静默返回 */
-  kill(pid: number): Promise<void>;
-  /** 进程是否还活着；image 非 null 时还要核对映像名一致 */
-  isAlive(pid: number, image: string | null): Promise<boolean>;
+  /**
+   * 结束整棵进程树；进程已不存在时静默返回。
+   * identity 非 null 时先核对身份，这个号已属于别的进程就静默返回、绝不动它
+   */
+  kill(pid: number, identity: ProcessIdentity | null): Promise<void>;
+  /** 进程是否还活着；identity 非 null 时还要核对映像名与创建时间，对不上视为不活 */
+  isAlive(pid: number, identity: ProcessIdentity | null): Promise<boolean>;
   /** 给苦工用的环境变量：当前进程环境 + 注册表里的用户级、系统级变量（只补缺的） */
   workerEnv(): Promise<Record<string, string>>;
   /** 配置变化后丢掉缓存的可执行文件路径 */

@@ -19,8 +19,12 @@ import type { EngineContext } from "./types.js";
 /**
  * 评审 F5：占位成工作中之后，到拿到进程号之间（resolve、读角色提示词、spawn）如果挂住，
  * 不能让这个名额永远占着——超过这个时长就主动收尾，绝不无限等待。
+ *
+ * 导出它是因为 identity.ts 的 identityOfRun 也要用到同一个数字：进程号只在这段赛跑之内
+ * 才会写进库，所以旧记录（升级前就在跑、没有 spawnedAt）用 startedAt + 这个时长兜底，
+ * 一定不会早于真正的进程创建时间——只写一份，不能有第二个地方各写各的。
  */
-const LAUNCH_TIMEOUT_MS = 60_000;
+export const LAUNCH_TIMEOUT_MS = 60_000;
 
 /** 配置里找不到角色时用的兜底空角色：只留编号，不附加任何提示词或工具限制。 */
 function emptyRole(roleId: string): RoleConfig {
@@ -77,7 +81,9 @@ export async function launchRun(
     void preparePromise.then(
       async (prepared) => {
         try {
-          await ctx.deps.host.kill(prepared.spawned.pid);
+          // 这个进程号是刚刚才拿到手的，不可能已经被系统复用给别的进程，不用核对身份
+          // （核对也无从核对：这次运行已经判过结局，不会再有 spawnedAt 落库）。
+          await ctx.deps.host.kill(prepared.spawned.pid, null);
         } catch (error) {
           ctx.deps.logger.error(`运行 ${run.id} 启动超时后又迟到启动成功，结束进程失败`, error);
         }
@@ -165,15 +171,23 @@ async function finishLaunchSuccess(
   prepared: PreparedLaunch,
 ): Promise<void> {
   const { spawned, adapter } = prepared;
-  ctx.deps.repos.runs.update(run.id, { pid: spawned.pid, processImage: spawned.image });
+  // 拿到进程号之后立刻取时间：真正的进程创建时间一定不晚于它，之后核对进程号有没有被
+  // 复用全靠这个时刻（模块设计 3.5 第 5 步）。pid、processImage、spawnedAt 一次写入。
+  const spawnedAtMs = ctx.now();
+  ctx.deps.repos.runs.update(run.id, {
+    pid: spawned.pid,
+    processImage: spawned.image,
+    spawnedAt: new Date(spawnedAtMs).toISOString(),
+  });
   ctx.notifyWorker(worker.id);
 
   // 启动期间被取消：cancel() 已经写了 killedBy=cancel，但那时候还拿不到进程号，
   // 只能等这里拿到进程号之后自己发现并立刻结束它（模块设计 3.5 第 7 步）。
+  // 这个进程号是刚刚才拿到手的，不可能被系统复用给别的进程，不用核对身份。
   const afterSpawn = ctx.deps.repos.runs.get(run.id);
   if (afterSpawn !== null && afterSpawn.killedBy === "cancel") {
     try {
-      await ctx.deps.host.kill(spawned.pid);
+      await ctx.deps.host.kill(spawned.pid, null);
     } catch (error) {
       ctx.deps.logger.error(`运行 ${run.id} 启动期间被取消，结束进程失败`, error);
     }
@@ -185,7 +199,7 @@ async function finishLaunchSuccess(
     runId: run.id,
     workerId: worker.id,
     pid: spawned.pid,
-    processImage: spawned.image,
+    identity: { image: spawned.image, spawnedAtMs },
     reducer: adapter.createReducer(),
     stdoutTailer: createOutputTailer(outFile, 0),
     stderrTailer: createOutputTailer(errFile, 0),

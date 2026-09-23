@@ -6,6 +6,7 @@ import {
   type WorkerSummary,
 } from "@fleet/core";
 import { finishRun } from "./finisher.js";
+import { identityOfRun } from "./identity.js";
 import type { EngineContext } from "./types.js";
 
 /** 取消工作中的苦工之后，最多等这么久让退出流程走完再返回（模块设计 3.9）。 */
@@ -55,7 +56,7 @@ export async function cancelWorker(ctx: EngineContext, id: string): Promise<Work
     }
     if (latest.pid !== null) {
       try {
-        await ctx.deps.host.kill(latest.pid);
+        await ctx.deps.host.kill(latest.pid, identityOfRun(latest));
       } catch (error) {
         ctx.deps.logger.error(`取消苦工 ${id} 时结束进程失败`, error);
       }

@@ -249,6 +249,7 @@ export function mapRunRow(row: Record<string, unknown>): RunRecord {
     queueTimeoutMs: readNullableInteger(row, "queue_timeout_ms", "runs"),
     pid: readNullableInteger(row, "pid", "runs"),
     processImage: readNullableString(row, "process_image", "runs"),
+    spawnedAt: readNullableString(row, "spawned_at", "runs"),
     exitCode: readNullableInteger(row, "exit_code", "runs"),
     killedBy: readNullableEnum(row, "killed_by", "runs", KILLED_BY_VALUES),
     usage: readUsage(row, "usage_json", "runs"),

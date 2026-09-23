@@ -1,9 +1,16 @@
 import { getRuntimeAdapter, type RunRecord } from "@fleet/core";
 import { finishRun, resolveAndFinishRun } from "./finisher.js";
+import { identityOfRun } from "./identity.js";
 import { flushRemainder, replayRunOutput } from "./outputReplay.js";
 import { createRunTracker } from "./runTracker.js";
 import { writeTimelineDrafts } from "./timelineFile.js";
-import type { EngineContext } from "./types.js";
+import type { EngineContext, ProcessIdentity } from "./types.js";
+
+/** 一条工作中的运行，配上并发发起之后拿到手（还没必然 resolve）的存活探测。 */
+interface RunProbe {
+  identity: ProcessIdentity;
+  alive: Promise<boolean>;
+}
 
 /**
  * 服务启动时接管（模块设计 3.14）：对每个工作中的运行判断要不要接着跟踪。
@@ -11,16 +18,32 @@ import type { EngineContext } from "./types.js";
  */
 export async function runRecovery(ctx: EngineContext): Promise<void> {
   const runningRuns = ctx.deps.repos.runs.listActive().filter((run) => run.status === "running");
+
+  // 存活探测要先对全部工作中的运行并发发起，让进程托管把同一轮查询合成一次 PowerShell，
+  // 等结果全部到手后再逐条接管或收尾；不能一条条串行等，否则接管 20 个苦工要多等 30 多秒
+  // （模块设计 3.14 末尾）。这个循环本身不 await 任何一次探测，只管把它们都发出去。
+  const probes = new Map<string, RunProbe>();
+  for (const run of runningRuns) {
+    if (run.pid !== null) {
+      const identity = identityOfRun(run);
+      probes.set(run.id, { identity, alive: ctx.deps.host.isAlive(run.pid, identity) });
+    }
+  }
+
   for (const run of runningRuns) {
     try {
-      await recoverRun(ctx, run);
+      await recoverRun(ctx, run, probes.get(run.id) ?? null);
     } catch (error) {
       ctx.deps.logger.error(`接管运行 ${run.id} 出错`, error);
     }
   }
 }
 
-async function recoverRun(ctx: EngineContext, run: RunRecord): Promise<void> {
+async function recoverRun(
+  ctx: EngineContext,
+  run: RunRecord,
+  probe: RunProbe | null,
+): Promise<void> {
   const worker = ctx.deps.repos.workers.get(run.workerId);
   if (worker === null) {
     ctx.deps.logger.error(`接管运行 ${run.id} 时找不到所属苦工，跳过`);
@@ -42,8 +65,14 @@ async function recoverRun(ctx: EngineContext, run: RunRecord): Promise<void> {
     });
     return;
   }
+  if (probe === null) {
+    // 理论上走不到这里：run.pid 非空时，上面的并发发起循环一定已经为它建好了探测。
+    ctx.deps.logger.error(`接管运行 ${run.id} 时缺少存活探测结果，跳过`);
+    return;
+  }
 
-  const alive = await ctx.deps.host.isAlive(run.pid, run.processImage);
+  const { identity, alive: alivePromise } = probe;
+  const alive = await alivePromise;
   const adapter = getRuntimeAdapter(worker.runtime);
   const at = run.startedAt ?? run.queuedAt;
   const replay = await replayRunOutput(
@@ -83,7 +112,7 @@ async function recoverRun(ctx: EngineContext, run: RunRecord): Promise<void> {
     runId: run.id,
     workerId: worker.id,
     pid: run.pid,
-    processImage: run.processImage,
+    identity,
     reducer: replay.reducer,
     stdoutTailer: replay.stdoutTailer,
     stderrTailer: replay.stderrTailer,

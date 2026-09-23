@@ -142,6 +142,10 @@ export function buildWorker(spec: WorkerSpec): { worker: WorkerRecord; runs: Run
       queueTimeoutMs: null,
       pid: run.status === "running" ? 41000 + index : null,
       processImage: run.status === "running" ? "node.exe" : null,
+      spawnedAt:
+        run.status === "running" && run.startedMin !== undefined
+          ? minutesAgo(run.startedMin)
+          : null,
       exitCode: run.status === "completed" ? 0 : null,
       killedBy: run.status === "cancelled" ? "cancel" : null,
       usage: run.status === "queued" ? usageOf(0, null) : usageOf(run.tokens ?? 24_000, costUsd),

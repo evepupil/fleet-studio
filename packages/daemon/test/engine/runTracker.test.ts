@@ -3,6 +3,7 @@ import { getRuntimeAdapter, PI_MAX_CONSECUTIVE_FAILURES, type RuntimeId } from "
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createRunTracker } from "../../src/engine/runTracker.js";
 import { createOutputTailer } from "../../src/process/outputTailer.js";
+import type { ProcessIdentity } from "../../src/process/types.js";
 import { createProjectRecord, createRunRecord, createWorkerRecord } from "./support/records.js";
 import {
   opencodeStepFinishLine,
@@ -12,6 +13,12 @@ import {
   piErrorLine,
 } from "./support/runtimeLines.js";
 import { createTestEngine, type TestEngine } from "./support/testEngine.js";
+
+/** 固定的一份身份，方便测试断言 kill/isAlive 收到的身份就是当初建跟踪器时给的这份。 */
+const TRACKER_IDENTITY: ProcessIdentity = {
+  image: "fake-runtime.exe",
+  spawnedAtMs: 1_700_000_000_000,
+};
 
 interface TrackerSetup {
   outFile: string;
@@ -55,7 +62,7 @@ async function setupTracker(
     runId: run.id,
     workerId: worker.id,
     pid,
-    processImage: "fake-runtime.exe",
+    identity: TRACKER_IDENTITY,
     reducer: getRuntimeAdapter(runtime).createReducer(),
     stdoutTailer: createOutputTailer(outFile, 0),
     stderrTailer: createOutputTailer(errFile, 0),
@@ -175,6 +182,9 @@ describe("runTracker：跟踪一次运行（模块设计 3.6）", () => {
     engine.advanceNow(1);
     await tracker.poll(engine.ctx.now());
     expect(engine.host.killedPids).toContain(setup.pid);
+    // 身份核对：ended 后的强杀要带上建跟踪器时给的那份身份，不能光给 pid。
+    const killCall = engine.host.killCalls.find((call) => call.pid === setup.pid);
+    expect(killCall?.identity).toEqual(TRACKER_IDENTITY);
   });
 
   it("接管的运行（isAdopted）：定期探测存活，发现已经不在了就自己收尾为 lost", async () => {
@@ -188,6 +198,9 @@ describe("runTracker：跟踪一次运行（模块设计 3.6）", () => {
     let done = await tracker.poll(engine.ctx.now());
     expect(done).toBe(false);
     expect(engine.repos.runs.get(setup.runId)?.status).toBe("running");
+    // 身份核对：接管场景的存活探测要带上建跟踪器时给的那份身份。
+    const aliveCall = engine.host.isAliveCalls.find((call) => call.pid === setup.pid);
+    expect(aliveCall?.identity).toEqual(TRACKER_IDENTITY);
 
     // 进程消失了（轮询存活发现的，不是通过 onExit）。
     engine.host.setAlive(setup.pid, false);

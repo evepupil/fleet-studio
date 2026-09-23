@@ -1,5 +1,6 @@
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { identityOfRun } from "../../src/engine/identity.js";
 import { runRecovery } from "../../src/engine/recovery.js";
 import { createProjectRecord, createRunRecord, createWorkerRecord } from "./support/records.js";
 import {
@@ -64,6 +65,12 @@ describe("recovery：服务启动时接管（模块设计 3.14）", () => {
     );
 
     await runRecovery(engine.ctx);
+
+    // 身份核对：这条运行是「旧记录」（spawnedAt 为 null），身份里的时刻要按
+    // startedAt + 启动超时算，不是直接 null——见 engine/identity.ts 的 identityOfRun。
+    expect(run.spawnedAt).toBeNull();
+    const aliveCall = engine.host.isAliveCalls.find((call) => call.pid === pid);
+    expect(aliveCall?.identity).toEqual(identityOfRun(run));
 
     expect(engine.ctx.trackers.has(run.id)).toBe(true);
     const page = await engine.ctx.timelines.timeline(worker.id, -1, 100);
@@ -181,6 +188,64 @@ describe("recovery：服务启动时接管（模块设计 3.14）", () => {
 
     expect(engine.repos.runs.get(run1.id)?.status).toBe("failed");
     expect(engine.repos.runs.get(run1.id)?.failReason).toBe("interrupted");
+    expect(engine.repos.runs.get(run2.id)?.status).toBe("running");
+    expect(engine.ctx.trackers.has(run2.id)).toBe(true);
+  });
+
+  it("存活探测先并发发起：两条运行的 isAlive 在处理任何一条结果之前就已经都发出去了（模块设计 3.14 末尾）", async () => {
+    const pid1 = 7101;
+    const pid2 = 7102;
+    engine.host.registerExistingProcess(pid1, true);
+    engine.host.registerExistingProcess(pid2, true);
+
+    const worker1 = createWorkerRecord({ id: "wconc001" });
+    const run1 = createRunRecord({
+      id: "wconc001.1",
+      workerId: "wconc001",
+      status: "running",
+      startedAt: "2026-01-01T00:00:01.000Z",
+      pid: pid1,
+      processImage: "fake-runtime.exe",
+    });
+    engine.repos.projects.insert(
+      createProjectRecord({ key: worker1.projectKey, path: worker1.cwd }),
+    );
+    engine.repos.workers.insert(worker1);
+    engine.repos.runs.insert(run1);
+    await mkdir(engine.ctx.deps.paths.runDir(run1.id), { recursive: true });
+    await writeFile(engine.ctx.deps.paths.outFile(run1.id), "", "utf8");
+    await writeFile(engine.ctx.deps.paths.errFile(run1.id), "", "utf8");
+
+    const worker2 = createWorkerRecord({ id: "wconc002" });
+    const run2 = createRunRecord({
+      id: "wconc002.1",
+      workerId: "wconc002",
+      status: "running",
+      startedAt: "2026-01-01T00:00:01.000Z",
+      pid: pid2,
+      processImage: "fake-runtime.exe",
+    });
+    // worker1 已经用同一个默认项目路径建过项目记录了，这里不用再插一次。
+    engine.repos.workers.insert(worker2);
+    engine.repos.runs.insert(run2);
+    await mkdir(engine.ctx.deps.paths.runDir(run2.id), { recursive: true });
+    await writeFile(engine.ctx.deps.paths.outFile(run2.id), "", "utf8");
+    await writeFile(engine.ctx.deps.paths.errFile(run2.id), "", "utf8");
+
+    // 卡住 isAlive：调用会先记进 isAliveCalls 再卡住，release 之前就能看到两条都已经发出去了，
+    // 证明不是「等第一条有结果了才发第二条」的串行写法。
+    const gate = engine.host.pauseIsAlive();
+    const recoveryPromise = runRecovery(engine.ctx);
+
+    expect(
+      engine.host.isAliveCalls.filter((call) => call.pid === pid1 || call.pid === pid2),
+    ).toHaveLength(2);
+
+    gate.release();
+    await recoveryPromise;
+
+    expect(engine.repos.runs.get(run1.id)?.status).toBe("running");
+    expect(engine.ctx.trackers.has(run1.id)).toBe(true);
     expect(engine.repos.runs.get(run2.id)?.status).toBe("running");
     expect(engine.ctx.trackers.has(run2.id)).toBe(true);
   });

@@ -8,6 +8,7 @@ import type {
   EngineContext,
   OutputTailer,
   ProcessExitInfo,
+  ProcessIdentity,
   RunTrackerHandle,
   StreamReducer,
 } from "./types.js";
@@ -23,7 +24,8 @@ export interface CreateRunTrackerOptions {
   runId: string;
   workerId: string;
   pid: number;
-  processImage: string | null;
+  /** 结束/探测这个 pid 之前核对身份用；见 engine/identity.ts 的 identityOfRun。 */
+  identity: ProcessIdentity;
   reducer: StreamReducer;
   stdoutTailer: OutputTailer;
   stderrTailer: OutputTailer;
@@ -41,7 +43,7 @@ export function createRunTracker(
   ctx: EngineContext,
   options: CreateRunTrackerOptions,
 ): RunTrackerHandle {
-  const { runId, workerId, pid, processImage, reducer, stdoutTailer, stderrTailer, isAdopted } =
+  const { runId, workerId, pid, identity, reducer, stdoutTailer, stderrTailer, isAdopted } =
     options;
 
   let finished = false;
@@ -131,7 +133,7 @@ export function createRunTracker(
     }
     killedForEnded = true;
     try {
-      await ctx.deps.host.kill(pid);
+      await ctx.deps.host.kill(pid, identity);
     } catch (error) {
       ctx.deps.logger.error(`「ended」超时未退出，结束进程失败：${runId}`, error);
     }
@@ -163,8 +165,19 @@ export function createRunTracker(
 
       if (isAdopted && nowMs - lastAliveCheckAtMs >= ADOPTED_ALIVE_CHECK_INTERVAL_MS) {
         lastAliveCheckAtMs = nowMs;
-        const alive = await ctx.deps.host.isAlive(pid, processImage);
+        const alive = await ctx.deps.host.isAlive(pid, identity);
         if (!alive) {
+          // 核对身份可能要另起一个 PowerShell 查 WMI，耗时比原来的 tasklist 明显更长；
+          // 这段等待期间进程可能刚好写完收尾内容并退出。确认不在之后必须再追一次输出，
+          // 并且这时候可以放心 flush 残留的半行（文件不会再增长了）——否则等待期间新写的
+          // 收尾内容（包括没有换行收尾的最后半行）会被判丢，白白把已经正常收尾的运行误判成
+          // interrupted。做法照抄 handleExitInternal 确认退出之后的收尾顺序。
+          const at = isoNow(nowMs);
+          const finalDrafts = await drainBoth(at);
+          flushRemainder(stdoutTailer, "stdout", reducer, at, finalDrafts);
+          flushRemainder(stderrTailer, "stderr", reducer, at, finalDrafts);
+          await publishDrafts(finalDrafts);
+          maybeCaptureSessionRef(reducer.progress());
           await finishInternal({ kind: "lost" });
           return true;
         }

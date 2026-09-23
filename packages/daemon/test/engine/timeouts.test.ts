@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { identityOfRun } from "../../src/engine/identity.js";
 import { runTimeoutSweep } from "../../src/engine/timeouts.js";
 import { createProjectRecord, createRunRecord, createWorkerRecord } from "./support/records.js";
 import { createTestEngine, type TestEngine } from "./support/testEngine.js";
@@ -40,6 +41,9 @@ describe("runTimeoutSweep：超时兜底检查（模块设计 3.8）", () => {
     expect(engine.repos.runs.get(run.id)?.killedBy).toBe("timeout");
     // 收尾是退出流程的事，超时检查本身不改状态。
     expect(engine.repos.runs.get(run.id)?.status).toBe("running");
+    // 身份核对：这条运行没有 spawnedAt（旧记录），身份里的时刻要按 startedAt + 启动超时算。
+    const killCall = engine.host.killCalls.find((call) => call.pid === pid);
+    expect(killCall?.identity).toEqual(identityOfRun(run));
   });
 
   it("工作中超时但进程号还没拿到：这一轮跳过，不报错、不改任何字段", async () => {

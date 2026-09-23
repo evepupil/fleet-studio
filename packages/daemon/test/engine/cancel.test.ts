@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { FleetError } from "@fleet/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cancelWorker } from "../../src/engine/cancel.js";
+import { identityOfRun } from "../../src/engine/identity.js";
 import { submitWorker } from "../../src/engine/submit.js";
 import { createProjectRecord, createRunRecord, createWorkerRecord } from "./support/records.js";
 import { createTestEngine, type TestEngine } from "./support/testEngine.js";
@@ -48,7 +49,7 @@ describe("cancelWorker：取消（模块设计 3.9）", () => {
   it("工作中且进程号已知：写 killedBy=cancel 并立刻结束进程", async () => {
     const pid = 4242;
     engine.host.registerExistingProcess(pid, true);
-    const { worker } = seedWorkerWithRun(engine, {
+    const { worker, run } = seedWorkerWithRun(engine, {
       status: "running",
       startedAt: "2026-01-01T00:00:01.000Z",
       pid,
@@ -61,6 +62,9 @@ describe("cancelWorker：取消（模块设计 3.9）", () => {
     const summaryPromise = cancelWorker(engine.ctx, worker.id);
     await waitFor(() => engine.host.killedPids.includes(pid));
     expect(engine.repos.runs.get(`${worker.id}.1`)?.killedBy).toBe("cancel");
+    // 身份核对：结束进程要带上按这次运行拼出来的身份，不能只给 pid。
+    const killCall = engine.host.killCalls.find((call) => call.pid === pid);
+    expect(killCall?.identity).toEqual(identityOfRun(run));
     await summaryPromise;
   });
 

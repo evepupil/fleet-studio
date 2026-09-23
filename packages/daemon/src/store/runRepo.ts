@@ -24,9 +24,9 @@ export function createRunRepo(db: DatabaseSync): RunRepo {
     `INSERT INTO runs (
        id, worker_id, seq, prompt, status, fail_reason, error_message,
        queued_at, started_at, ended_at, timeout_ms, queue_timeout_ms,
-       pid, process_image, exit_code, killed_by, usage_json, retry_json,
+       pid, process_image, spawned_at, exit_code, killed_by, usage_json, retry_json,
        activity, last_activity_at, final_text, event_count
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
   );
   const listByWorkerStmt = db.prepare("SELECT * FROM runs WHERE worker_id = ? ORDER BY seq ASC;");
   const listActiveStmt = db.prepare(
@@ -70,6 +70,7 @@ export function createRunRepo(db: DatabaseSync): RunRepo {
         run.queueTimeoutMs,
         run.pid,
         run.processImage,
+        run.spawnedAt,
         run.exitCode,
         run.killedBy,
         usageToJson(run.usage),
@@ -120,6 +121,10 @@ export function createRunRepo(db: DatabaseSync): RunRepo {
       if (patch.processImage !== undefined) {
         assignments.push("process_image = ?");
         values.push(patch.processImage);
+      }
+      if (patch.spawnedAt !== undefined) {
+        assignments.push("spawned_at = ?");
+        values.push(patch.spawnedAt);
       }
       if (patch.exitCode !== undefined) {
         assignments.push("exit_code = ?");
