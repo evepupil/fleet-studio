@@ -1,6 +1,6 @@
 // 看板验收用的最小调试协议客户端：启动无头 Edge，打开构建产物，截图、执行脚本。
 // 不起任何服务器：构建产物用相对路径引用资源，配合 --allow-file-access-from-files 直接用 file:// 打开。
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -128,13 +128,23 @@ export async function launchBrowser(port) {
     },
     async close() {
       socket.close();
-      child.kill();
-      await sleep(300);
-      // 浏览器子进程退出后可能还短暂占着临时配置目录里的文件，删不掉就留给系统清理，不让验收报错
+      const exited = new Promise((resolve) => {
+        if (child.exitCode !== null || child.signalCode !== null) resolve();
+        else child.once("exit", resolve);
+      });
+      // Edge 会拉起一串子进程（渲染、GPU、崩溃收集），只结束主进程会把它们留成孤儿，
+      // 一直占着临时档案（2026-09-24 实测残留 9 个进程、446MB 档案挂了 5 个小时）。
+      // 主进程句柄还在手里，进程号不会被复用，按进程树整棵结束是安全的。
+      if (process.platform === "win32") {
+        spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+      } else {
+        child.kill("SIGKILL");
+      }
+      await Promise.race([exited, sleep(5000)]);
       try {
-        rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
-      } catch {
-        // 忽略：只是临时目录
+        rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+      } catch (error) {
+        console.warn(`临时浏览器档案没删掉，请手动清理：${profile}（${error.message}）`);
       }
     },
   };
