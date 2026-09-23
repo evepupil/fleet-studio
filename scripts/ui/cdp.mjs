@@ -82,6 +82,9 @@ export async function launchBrowser(port) {
     });
   await rpc("Page.enable");
   await rpc("Runtime.enable");
+  // 无头页面默认没有获得焦点，脚本里调用 focus() 只改 activeElement、不触发聚焦事件，
+  // 键盘聚焦类的交互（例如聚焦格子弹出提示卡）会因此测不出来。打开焦点模拟后行为与真实窗口一致。
+  await rpc("Emulation.setFocusEmulationEnabled", { enabled: true });
 
   return {
     rpc,
@@ -93,9 +96,13 @@ export async function launchBrowser(port) {
         mobile: false,
       });
     },
-    async setTheme(theme) {
+    async setTheme(theme, reducedMotion = "no-preference") {
+      // 本机系统设置会让浏览器报告「减少动效」，截图时默认显式模拟不减少，才能看到常规画法
       await rpc("Emulation.setEmulatedMedia", {
-        features: [{ name: "prefers-color-scheme", value: theme }],
+        features: [
+          { name: "prefers-color-scheme", value: theme },
+          { name: "prefers-reduced-motion", value: reducedMotion },
+        ],
       });
     },
     async open(url, waitMs = 1200) {
@@ -123,7 +130,12 @@ export async function launchBrowser(port) {
       socket.close();
       child.kill();
       await sleep(300);
-      rmSync(profile, { recursive: true, force: true });
+      // 浏览器子进程退出后可能还短暂占着临时配置目录里的文件，删不掉就留给系统清理，不让验收报错
+      try {
+        rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+      } catch {
+        // 忽略：只是临时目录
+      }
     },
   };
 }
