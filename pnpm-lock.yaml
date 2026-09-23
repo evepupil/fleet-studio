@@ -98,6 +98,9 @@ importers:
 
   packages/testkit:
     devDependencies:
+      '@fleet/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: ^26.6.2
         version: 26.6.2

@@ -13,6 +13,7 @@
     "build": "tsc -b"
   },
   "devDependencies": {
+    "@fleet/core": "workspace:*",
     "@types/node": "^26.6.2"
   }
 }
