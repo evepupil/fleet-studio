@@ -1,0 +1,18 @@
+.root {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-1) var(--sp-2) var(--sp-4);
+}
+
+.groupList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}

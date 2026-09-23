@@ -1,0 +1,90 @@
+.root {
+  margin-top: var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  row-gap: var(--sp-3);
+  column-gap: var(--sp-6);
+}
+
+.cell {
+  min-width: 0;
+}
+
+.label {
+  margin: 0;
+  font-size: var(--fs-11);
+  line-height: var(--lh-11);
+  font-weight: var(--fw-medium);
+  color: var(--text-3);
+}
+
+.value {
+  margin: 2px 0 0;
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.valueMono {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extra {
+  margin: 2px 0 0;
+  font-size: var(--fs-11);
+  line-height: var(--lh-11);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extraMono {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  line-height: var(--lh-11);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectName {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.projectNameText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1023px) {
+  .root {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}

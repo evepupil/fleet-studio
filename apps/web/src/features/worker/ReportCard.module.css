@@ -1,0 +1,88 @@
+.root {
+  margin-top: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background-color: var(--bg-raised);
+  padding: 14px 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.headerTitle {
+  font-size: var(--fs-14);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+}
+
+.runLabel {
+  margin-left: auto;
+  font-size: var(--fs-11);
+  color: var(--text-3);
+}
+
+.dl {
+  margin: var(--sp-3) 0 0;
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  row-gap: 10px;
+  column-gap: var(--sp-3);
+}
+
+.dt {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-semibold);
+  color: var(--text-3);
+  letter-spacing: 0.4px;
+}
+
+.ddCell {
+  margin: 0;
+  min-width: 0;
+}
+
+.verdictLine {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+}
+
+.clampWrapper {
+  min-width: 0;
+  flex: 1;
+}
+
+.text {
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  color: var(--text-1);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.textMuted {
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  color: var(--text-3);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.rawBlock {
+  margin-top: var(--sp-3);
+}
+
+.toggle {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-12);
+  color: var(--accent);
+}
+
+.toggle:hover {
+  text-decoration: underline;
+}

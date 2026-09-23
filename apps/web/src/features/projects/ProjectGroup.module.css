@@ -1,0 +1,60 @@
+.root {
+  display: block;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-md);
+  background-color: transparent;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.header:hover {
+  background-color: var(--bg-hover);
+}
+
+.chevron {
+  flex: none;
+  color: var(--text-3);
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.chevron[data-open="true"] {
+  transform: rotate(90deg);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-medium);
+  color: var(--text-1);
+}
+
+.countsRow {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.countItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.countValue {
+  color: var(--text-2);
+}

@@ -1,0 +1,18 @@
+.root {
+  margin-top: var(--sp-4);
+}
+
+.box {
+  margin-top: var(--sp-1);
+  background-color: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  color: var(--text-1);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 360px;
+  overflow-y: auto;
+}

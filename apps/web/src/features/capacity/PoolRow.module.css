@@ -1,0 +1,68 @@
+/* 176px / 208px / 10px 是页面层规格写死的布局尺寸（design/工作区.md R3 第 2 节），不是令牌。 */
+.root {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr) 208px;
+  column-gap: var(--sp-5);
+  padding-block: 10px;
+  align-items: start;
+}
+
+.root + .root {
+  border-top: 1px solid var(--line);
+}
+
+.nameCol {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.poolId {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+}
+
+.poolLabel {
+  font-size: var(--fs-12);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.poolModel {
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meterCol {
+  min-width: 0;
+}
+
+.pausedTrack {
+  height: var(--slot-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--meter-track);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-slot);
+}
+
+.pausedText {
+  font-size: var(--fs-11);
+  color: var(--text-3);
+}
+
+@media (max-width: 1023px) {
+  .root {
+    grid-template-columns: 1fr;
+    row-gap: var(--sp-2);
+  }
+}
