@@ -148,6 +148,7 @@ function emit(type: string, data: Record<string, unknown>) {
 | `--session <id>` / `-s` | 续接指定会话 | 见第 4 节。 |
 | `--continue` / `-c` | 续接"最近一个顶层会话" | 找的是 `session.list()` 里第一个 `parentID` 为空的会话（run.ts:492),会跳过子 agent 创建的子会话。 |
 | `--fork` | 续接前先分叉 | 必须搭配 `--continue` 或 `--session`,分叉出一个新会话 id,原会话不受影响（run.ts:425-428）。 |
+| `-f` / `--file <路径...>` | 把文件作为附件交给模型 | **数组类型参数**（`opencode run --help` 标注 `[array]`）：会把紧跟其后的位置参数也收进附件列表。必须在它后面紧跟一个开关参数（例如 `--thinking`）再写任务正文。本条由主会话 2026-09-23 补充 |
 | `--print-logs` / `--log-level` | 把内部日志打到 stderr | 排查问题很有用,`--log-level DEBUG` 能看到每一步在做什么、重试了几次(见第 6 节样本)。**不是 JSON 事件**,是单独一行文本日志格式,守护进程正常解析 JSON 流时不需要开,调试时才开。 |
 
 ### 3.1 关键问题：非交互 run 会不会因为权限确认卡住等输入
