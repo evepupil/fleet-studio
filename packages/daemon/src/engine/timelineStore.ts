@@ -115,6 +115,9 @@ export function createTimelineStore(deps: TimelineStoreDeps): TimelineStore {
         continue; // 常驻缓存，不参与淘汰
       }
       cache.delete(workerId);
+      // 评审 F6a：activeFlags 之前只 set 不 delete，长期运行会无限增长；
+      // 缓存里都已经淘汰掉的苦工，它的常驻标记也一并清掉。
+      activeFlags.delete(workerId);
     }
   }
 
@@ -161,5 +164,11 @@ export function createTimelineStore(deps: TimelineStoreDeps): TimelineStore {
     return { events: selected, next: last?.seq ?? after, total: cached.length };
   }
 
-  return { appendDrafts, refresh, timeline };
+  /** 评审 F6a：过期清理删掉苦工之后调用，避免 cache/activeFlags 里留着永远用不到的条目。 */
+  function forget(workerId: string): void {
+    cache.delete(workerId);
+    activeFlags.delete(workerId);
+  }
+
+  return { appendDrafts, refresh, timeline, forget };
 }

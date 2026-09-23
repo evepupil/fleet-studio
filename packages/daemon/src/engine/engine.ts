@@ -167,8 +167,19 @@ export function createEngine(deps: EngineDeps): Engine {
     },
 
     async start(): Promise<void> {
-      await runRecovery(ctx);
-      await runRetentionSweep(ctx);
+      // 评审 F6b：接管、过期清理各自内部已经按运行/目录单独 try/catch 隔离了，
+      // 这里再包一层是防住两者自己都没料到的顶层异常（例如查库本身出错）——
+      // 不管哪个出了意外，都只记日志，不能让服务因为接管或清理失败就启动不起来。
+      try {
+        await runRecovery(ctx);
+      } catch (error) {
+        deps.logger.error("服务启动时接管出错", error);
+      }
+      try {
+        await runRetentionSweep(ctx);
+      } catch (error) {
+        deps.logger.error("服务启动时的过期清理出错", error);
+      }
 
       unsubscribeConfig = deps.config.onChange(() => {
         deps.host.invalidate();

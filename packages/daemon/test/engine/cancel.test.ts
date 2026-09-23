@@ -75,6 +75,25 @@ describe("cancelWorker：取消（模块设计 3.9）", () => {
     expect(summary.status).toBe("running");
   });
 
+  it("F3 回归：killedBy 已经被超时检查抢先写过，取消不会覆盖成 cancel", async () => {
+    const pid = 5151;
+    engine.host.registerExistingProcess(pid, true);
+    const { worker } = seedWorkerWithRun(engine, {
+      status: "running",
+      startedAt: "2026-01-01T00:00:01.000Z",
+      pid,
+      processImage: "fake-runtime.exe",
+      killedBy: "timeout",
+    });
+
+    await cancelWorker(engine.ctx, worker.id);
+
+    // killedBy 谁先写谁算：这里超时检查已经先标记过了，取消不能改写成 cancel。
+    expect(engine.repos.runs.get(`${worker.id}.1`)?.killedBy).toBe("timeout");
+    // 即便没抢到 killedBy，取消仍然要真的去结束进程（进程终究要被杀掉）。
+    expect(engine.host.killedPids).toContain(pid);
+  });
+
   it("已经是终态的苦工：原样返回，不报错、不改变状态", async () => {
     const { worker } = seedWorkerWithRun(engine, {
       status: "completed",

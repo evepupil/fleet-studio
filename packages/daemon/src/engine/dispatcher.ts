@@ -133,6 +133,9 @@ async function failPoolRemovedRuns(ctx: EngineContext): Promise<void> {
       continue;
     }
     try {
+      // 评审 F2：这里的 run 来自本函数开头取的排队快照，处理前一个运行时如果
+      // await 了一段时间，这个运行可能已经被放行、甚至被取消收尾过——finishRun
+      // 会重读库并核对 expectedStatus="queued"，不再是排队中就放弃，不会覆盖已经写好的终态。
       await finishRun(ctx, {
         run,
         worker,
@@ -146,6 +149,7 @@ async function failPoolRemovedRuns(ctx: EngineContext): Promise<void> {
         activity: run.activity,
         finalText: run.finalText,
         eventCount: run.eventCount,
+        expectedStatus: "queued",
       });
     } catch (error) {
       ctx.deps.logger.error(`运行 ${run.id} 判定 pool_removed 收尾出错`, error);

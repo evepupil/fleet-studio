@@ -101,4 +101,79 @@ describe("runTimeoutSweep：超时兜底检查（模块设计 3.8）", () => {
     expect(engine.repos.runs.get(run.id)?.killedBy).toBeNull();
     expect(engine.host.killedPids).toHaveLength(0);
   });
+
+  it("F3 回归：killedBy 已经被取消抢先写过，超时检查不会覆盖成 timeout，也不会再抢着杀进程", async () => {
+    const pid = 4444;
+    engine.host.registerExistingProcess(pid, true);
+    const run = createRunRecord({
+      status: "running",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      timeoutMs: 30 * 60_000,
+      pid,
+      processImage: "fake-runtime.exe",
+      killedBy: "cancel",
+    });
+    seed(engine, run);
+
+    await runTimeoutSweep(engine.ctx);
+
+    expect(engine.repos.runs.get(run.id)?.killedBy).toBe("cancel");
+    expect(engine.host.killedPids).toHaveLength(0);
+  });
+
+  it("F1 回归：处理 A 的收尾期间 B 被放行成 running，不会被误杀成 queue_timeout", async () => {
+    const workerA = createWorkerRecord({ id: "waaaaa1" });
+    const runA = createRunRecord({
+      id: "waaaaa1.1",
+      workerId: "waaaaa1",
+      status: "queued",
+      queuedAt: "2026-01-01T00:00:00.000Z",
+      queueTimeoutMs: 30 * 60_000,
+    });
+    engine.repos.projects.insert(
+      createProjectRecord({ key: workerA.projectKey, path: workerA.cwd }),
+    );
+    engine.repos.workers.insert(workerA);
+    engine.repos.runs.insert(runA);
+
+    const workerB = createWorkerRecord({
+      id: "wbbbbb1",
+      projectKey: "c:\\code\\b",
+      cwd: "C:\\code\\b",
+    });
+    const runB = createRunRecord({
+      id: "wbbbbb1.1",
+      workerId: "wbbbbb1",
+      status: "queued",
+      queuedAt: "2026-01-01T00:00:00.000Z",
+      queueTimeoutMs: 30 * 60_000,
+    });
+    engine.repos.projects.insert(
+      createProjectRecord({ key: workerB.projectKey, path: workerB.cwd }),
+    );
+    engine.repos.workers.insert(workerB);
+    engine.repos.runs.insert(runB);
+
+    // finishRun 收尾 A 时会调用 timelines.refresh；这里借它模拟评审描述的原始竞态：
+    // 「处理 A 期间，B 被放行成了工作中」。
+    const originalRefresh = engine.ctx.timelines.refresh;
+    let injected = false;
+    engine.ctx.timelines.refresh = async (workerId: string): Promise<void> => {
+      if (workerId === workerA.id && !injected) {
+        injected = true;
+        engine.repos.runs.update(runB.id, {
+          status: "running",
+          startedAt: "2026-01-01T00:30:00.000Z",
+        });
+      }
+      return originalRefresh(workerId);
+    };
+
+    await runTimeoutSweep(engine.ctx);
+
+    expect(engine.repos.runs.get(runA.id)?.status).toBe("failed");
+    expect(engine.repos.runs.get(runA.id)?.failReason).toBe("queue_timeout");
+    // B 已经在工作中了，不能被同一轮超时检查误判成排队超时收尾掉。
+    expect(engine.repos.runs.get(runB.id)?.status).toBe("running");
+  });
 });

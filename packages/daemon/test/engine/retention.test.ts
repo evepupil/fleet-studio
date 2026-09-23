@@ -101,6 +101,22 @@ describe("retention：过期清理（模块设计 3.15）", () => {
     expect(engine.repos.projects.get("c:\\code\\orphan")).toBeNull();
   });
 
+  it("F6a 回归：删掉苦工时同步通知 timelineStore 忘掉它，避免缓存表只增不减", async () => {
+    const oldEndedAt = new Date(NOW_MS - (RETENTION_DAYS + 1) * 24 * 60 * 60 * 1000).toISOString();
+    const { workerId } = await seedFinishedWorker(engine, "wforget1", oldEndedAt);
+
+    const forgotten: string[] = [];
+    const originalForget = engine.ctx.timelines.forget;
+    engine.ctx.timelines.forget = (id: string): void => {
+      forgotten.push(id);
+      originalForget(id);
+    };
+
+    await runRetentionSweep(engine.ctx);
+
+    expect(forgotten).toEqual([workerId]);
+  });
+
   it("清理完之后记一条日志，写明删了多少", async () => {
     const oldEndedAt = new Date(NOW_MS - (RETENTION_DAYS + 1) * 24 * 60 * 60 * 1000).toISOString();
     await seedFinishedWorker(engine, "wlog0001", oldEndedAt);

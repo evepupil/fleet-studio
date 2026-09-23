@@ -1,6 +1,6 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { launchRun } from "../../src/engine/launcher.js";
 import { createProjectRecord, createRunRecord, createWorkerRecord } from "./support/records.js";
 import { createTestEngine, type TestEngine } from "./support/testEngine.js";
@@ -144,5 +144,70 @@ describe("launchRun：把一次运行真正拉起来（模块设计 3.5）", () 
     if (pid !== null) {
       await waitFor(() => engine.host.killedPids.includes(pid));
     }
+  });
+
+  it("F5 回归：拿进程号阶段（resolve）永远不返回，60 秒后收尾为启动超时", async () => {
+    engine.host.hangNextResolve();
+    const { worker, run } = await seedRunningRun(engine);
+
+    vi.useFakeTimers();
+    try {
+      const launchPromise = launchRun(engine.ctx, run, worker);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await launchPromise;
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const updated = engine.repos.runs.get(run.id);
+    expect(updated?.status).toBe("failed");
+    expect(updated?.failReason).toBe("spawn_error");
+    expect(updated?.errorMessage).toContain("启动超时");
+    expect(updated?.pid).toBeNull();
+  });
+
+  it("F5 回归：启动阶段一直卡住时被取消，超时之后收尾为已取消而不是启动超时失败", async () => {
+    engine.host.hangNextResolve();
+    const { worker, run } = await seedRunningRun(engine);
+    engine.repos.runs.update(run.id, { killedBy: "cancel" }); // 模拟 cancel() 抢先写过
+
+    vi.useFakeTimers();
+    try {
+      const launchPromise = launchRun(engine.ctx, run, worker);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await launchPromise;
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const updated = engine.repos.runs.get(run.id);
+    expect(updated?.status).toBe("cancelled");
+    expect(updated?.errorMessage).toBe("已被取消");
+  });
+
+  it("F5 回归：超时先收尾之后，迟到的 spawn 成功结果会被立刻杀掉，不留孤儿进程", async () => {
+    const gate = engine.host.hangNextSpawn();
+    const { worker, run } = await seedRunningRun(engine);
+
+    vi.useFakeTimers();
+    try {
+      const launchPromise = launchRun(engine.ctx, run, worker);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await launchPromise;
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(engine.repos.runs.get(run.id)?.failReason).toBe("spawn_error");
+    expect(engine.host.killedPids).toHaveLength(0);
+
+    // 现在放开卡住的 spawn，模拟它「迟到」才返回成功——用的是真定时器，走真实的文件 IO。
+    gate.release();
+    await waitFor(() => engine.host.spawnedProcesses.length > 0);
+    const lateSpawn = engine.host.spawnedProcesses[0];
+    if (lateSpawn === undefined) {
+      throw new Error("迟到的 spawn 应该已经完成");
+    }
+    await waitFor(() => engine.host.killedPids.includes(lateSpawn.pid));
   });
 });

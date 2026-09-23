@@ -42,6 +42,10 @@ export interface FakeProcessHost extends ProcessHost {
   registerExistingProcess(pid: number, alive: boolean): void;
   failNextSpawn(error: Error): void;
   failNextResolve(error: Error): void;
+  /** 让下一次 resolve() 永远不返回，用于测试评审 F5 的启动阶段超时保护。 */
+  hangNextResolve(): void;
+  /** 让下一次 spawn() 卡住，直到测试调用返回的 release()——用于测试「超时之后才迟到启动成功」。 */
+  hangNextSpawn(): { release(): void };
 }
 
 interface Entry {
@@ -58,6 +62,8 @@ export function createFakeProcessHost(options: FakeProcessHostOptions = {}): Fak
   let invalidateCallCount = 0;
   let pendingSpawnError: Error | null = null;
   let pendingResolveError: Error | null = null;
+  let resolveHangs = false;
+  let pendingSpawnGate: Promise<void> | null = null;
   const killedPids: number[] = [];
   const spawned = new Map<number, FakeSpawnedProcessInfo>();
   const entries = new Map<number, Entry>();
@@ -96,6 +102,10 @@ export function createFakeProcessHost(options: FakeProcessHostOptions = {}): Fak
     },
 
     async resolve(runtime: RuntimeId): Promise<ResolvedCommand> {
+      if (resolveHangs) {
+        // 故意永远不 resolve/reject，模拟真的卡住；测试用假定时器把 launcher 的超时逼出来。
+        return new Promise<ResolvedCommand>(() => {});
+      }
       if (pendingResolveError !== null) {
         const error = pendingResolveError;
         pendingResolveError = null;
@@ -105,6 +115,11 @@ export function createFakeProcessHost(options: FakeProcessHostOptions = {}): Fak
     },
 
     async spawn(request: SpawnRequest): Promise<SpawnedProcess> {
+      if (pendingSpawnGate !== null) {
+        const gate = pendingSpawnGate;
+        pendingSpawnGate = null;
+        await gate; // 卡在这里，直到测试调用 release()
+      }
       if (pendingSpawnError !== null) {
         const error = pendingSpawnError;
         pendingSpawnError = null;
@@ -192,6 +207,22 @@ export function createFakeProcessHost(options: FakeProcessHostOptions = {}): Fak
 
     failNextResolve(error: Error): void {
       pendingResolveError = error;
+    },
+
+    hangNextResolve(): void {
+      resolveHangs = true;
+    },
+
+    hangNextSpawn(): { release(): void } {
+      let releaseFn: () => void = () => {};
+      pendingSpawnGate = new Promise<void>((resolve) => {
+        releaseFn = resolve;
+      });
+      return {
+        release(): void {
+          releaseFn();
+        },
+      };
     },
   };
 }

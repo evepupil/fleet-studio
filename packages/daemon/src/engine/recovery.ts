@@ -38,6 +38,7 @@ async function recoverRun(ctx: EngineContext, run: RunRecord): Promise<void> {
       activity: run.activity,
       finalText: run.finalText,
       eventCount: run.eventCount,
+      expectedStatus: "running",
     });
     return;
   }

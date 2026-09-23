@@ -1,4 +1,4 @@
-import { appendFile, mkdir } from "node:fs/promises";
+import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createEventBus } from "../../src/engine/events.js";
@@ -114,5 +114,28 @@ describe("timelineStore：时间线缓存与增量通知（模块设计 3.10）"
 
     expect(reloadedPage?.events).toEqual(originalPage?.events);
     expect(reloadedPage?.total).toBe(originalPage?.total);
+  });
+
+  it("F6a 回归：forget() 清掉缓存，之后重新计算而不是继续沿用旧缓存", async () => {
+    const workerId = await runToCompletion(engine, "旧结论");
+    const before = await engine.ctx.timelines.timeline(workerId, -1, 1000);
+    expect(before?.events.some((event) => event.kind === "text")).toBe(true);
+
+    // 直接改写磁盘上的 timeline.jsonl，模拟底层数据变了；如果 forget() 没有真的清掉缓存，
+    // 下面再查一次还是会拿到旧内容，因为已经结束的运行会优先命中缓存。
+    const runId = `${workerId}.1`;
+    await writeFile(
+      engine.ctx.deps.paths.timelineFile(runId),
+      `${JSON.stringify({ kind: "text", at: "2026-01-01T00:00:02.000Z", text: "新结论占位" })}\n`,
+      "utf8",
+    );
+
+    engine.ctx.timelines.forget(workerId);
+    const after = await engine.ctx.timelines.timeline(workerId, -1, 1000);
+
+    const texts = (after?.events ?? [])
+      .filter((event) => event.kind === "text")
+      .map((event) => (event.kind === "text" ? event.text : ""));
+    expect(texts).toEqual(["新结论占位"]);
   });
 });

@@ -24,6 +24,11 @@ export async function runRetentionSweep(ctx: EngineContext): Promise<void> {
     }
     // workers 表对 runs 有 ON DELETE CASCADE，删苦工会一并删掉它的全部运行记录。
     ctx.deps.repos.workers.deleteMany(workerIds);
+    // 评审 F6a：苦工都删了，timelineStore 里对应的缓存和常驻标记也要一并清掉，
+    // 否则这两张表会随着「建档又过期」的苦工数量只增不减。
+    for (const workerId of workerIds) {
+      ctx.timelines.forget(workerId);
+    }
   }
 
   const orphanCount = ctx.deps.repos.projects.deleteOrphansCreatedBefore(cutoff);

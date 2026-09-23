@@ -111,4 +111,52 @@ describe("放行循环：容量占位与公平放行（模块设计 3.4）", () 
     expect(run?.failReason).toBe("pool_removed");
     expect(run?.errorMessage).toContain("dsf");
   });
+
+  it("F2 回归：处理 A 的收尾期间 B 被取消收尾，池删除的清理不会覆盖成 pool_removed", async () => {
+    const zeroCapacity = engine.config.current();
+    engine.config.setConfig({
+      ...zeroCapacity,
+      pools: [{ ...basePoolOf(zeroCapacity), capacity: 0 }], // 保证两个任务都卡在排队中
+    });
+    const summaryA = await submitInto(engine, projectA, "甲占坑");
+    engine.advanceNow(10); // 保证 A 的 queuedAt 严格早于 B，放行循环处理顺序才是确定的
+    const summaryB = await submitInto(engine, projectA, "乙占坑");
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(engine.repos.runs.get(`${summaryA.id}.1`)?.status).toBe("queued");
+    expect(engine.repos.runs.get(`${summaryB.id}.1`)?.status).toBe("queued");
+
+    // 把整个池删掉，换一个新池顶替默认池的位置。
+    const currentConfig = engine.config.current();
+    engine.config.setConfig({
+      ...currentConfig,
+      defaults: { ...currentConfig.defaults, pool: "other" },
+      pools: [{ ...basePoolOf(currentConfig), id: "other" }],
+    });
+
+    // finishRun 收尾 A 时会调用 timelines.refresh；借它模拟评审描述的原始竞态：
+    // 「处理 A 期间，B 被取消收尾了」。
+    const originalRefresh = engine.ctx.timelines.refresh;
+    let injected = false;
+    engine.ctx.timelines.refresh = async (workerId: string): Promise<void> => {
+      if (workerId === summaryA.id && !injected) {
+        injected = true;
+        engine.repos.runs.update(`${summaryB.id}.1`, {
+          status: "cancelled",
+          failReason: null,
+          errorMessage: "已被取消",
+          endedAt: "2026-01-01T00:30:00.000Z",
+        });
+      }
+      return originalRefresh(workerId);
+    };
+
+    engine.ctx.requestDispatch();
+
+    await waitFor(() => engine.repos.runs.get(`${summaryA.id}.1`)?.status === "failed");
+    expect(engine.repos.runs.get(`${summaryA.id}.1`)?.failReason).toBe("pool_removed");
+    // B 已经被取消收尾了，不能被同一轮 pool_removed 清理覆盖掉。
+    const runB = engine.repos.runs.get(`${summaryB.id}.1`);
+    expect(runB?.status).toBe("cancelled");
+    expect(runB?.failReason).toBeNull();
+  });
 });

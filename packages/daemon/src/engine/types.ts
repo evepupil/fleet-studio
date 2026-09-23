@@ -75,6 +75,8 @@ export interface TimelineStore {
   refresh(workerId: string): Promise<void>;
   /** 苦工不存在返回 null；否则返回 seq > after 的最多 limit 条。 */
   timeline(workerId: string, after: number, limit: number): Promise<TimelinePage | null>;
+  /** 苦工被过期清理删掉之后调用：清掉缓存和常驻标记，避免长期运行的服务里这些表只增不减（评审 F6a）。 */
+  forget(workerId: string): void;
 }
 
 /** 快照缓存：查库、算排队位置、拼快照、按 5 秒节流重算。 */
@@ -136,6 +138,12 @@ export interface FinishInput {
   activity: string | null;
   finalText: string | null;
   eventCount: number;
+  /**
+   * 收尾前重读到的当前状态必须等于这个值才真的收尾，不等就放弃（评审 F1/F2/F4）。
+   * 排队超时、池被删除、取消排队中的运行传 "queued"；进程退出收尾、接管后收尾传 "running"。
+   * 不传就只做「已是终态」的兜底检查，不做更严格的期望值比较。
+   */
+  expectedStatus?: "queued" | "running";
 }
 
 /** resolveAndFinishRun 需要的、由事件流解析出的进展与进程退出信息，交给 resolveRunOutcome 判定结局后再收尾。 */

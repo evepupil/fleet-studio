@@ -139,6 +139,50 @@ describe("createEngine：组装与生命周期（模块设计 3.1）", () => {
     expect(harness.repos.runs.get(run.id)?.status).toBe("queued");
   });
 
+  it("F6b 回归：接管在顶层抛错时不阻止启动，只记日志", async () => {
+    harness = await createHarness();
+    const originalListActive = harness.repos.runs.listActive;
+    let calls = 0;
+    harness.repos.runs.listActive = () => {
+      calls += 1;
+      if (calls === 1) {
+        throw new Error("模拟查库炸了");
+      }
+      return originalListActive();
+    };
+
+    const engine = createEngine(harness.deps);
+    await expect(engine.start()).resolves.toBeUndefined();
+    try {
+      expect(
+        harness.logger.records.some(
+          (record) => record.level === "error" && record.message.includes("接管"),
+        ),
+      ).toBe(true);
+    } finally {
+      await engine.stop();
+    }
+  });
+
+  it("F6b 回归：过期清理在顶层抛错时不阻止启动，只记日志", async () => {
+    harness = await createHarness();
+    harness.repos.runs.listExpiredWorkerIds = () => {
+      throw new Error("模拟查库炸了");
+    };
+
+    const engine = createEngine(harness.deps);
+    await expect(engine.start()).resolves.toBeUndefined();
+    try {
+      expect(
+        harness.logger.records.some(
+          (record) => record.level === "error" && record.message.includes("过期清理"),
+        ),
+      ).toBe(true);
+    } finally {
+      await engine.stop();
+    }
+  });
+
   it("配置外部变化时：invalidate 进程托管缓存、标记快照脏、发 snapshot 事件", async () => {
     harness = await createHarness();
     const engine = createEngine(harness.deps);

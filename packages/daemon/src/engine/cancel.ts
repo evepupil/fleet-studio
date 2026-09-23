@@ -32,6 +32,8 @@ export async function cancelWorker(ctx: EngineContext, id: string): Promise<Work
   }
 
   if (latest.status === "queued") {
+    // 评审 F2 同款保护：latest 是前面查出来的快照，finishRun 会自己重读库核对
+    // expectedStatus="queued"，万一在此之前已经被放行/收尾也不会覆盖。
     await finishRun(ctx, {
       run: latest,
       worker,
@@ -41,11 +43,16 @@ export async function cancelWorker(ctx: EngineContext, id: string): Promise<Work
       activity: latest.activity,
       finalText: latest.finalText,
       eventCount: latest.eventCount,
+      expectedStatus: "queued",
     });
   } else {
     // 工作中：先落库标记，再结束进程；进程号还没拿到时，launcher 拿到 pid 的那一刻会自己发现
     // killedBy 已经是 cancel，立刻结束新起的进程（模块设计 3.5 第 7 步）。
-    ctx.deps.repos.runs.update(latest.id, { killedBy: "cancel" });
+    // 评审 F3：谁先写 killedBy 谁算——latest 是刚查出来的，到这里还没有 await，仍然新鲜；
+    // 已经有别的路径（比如超时检查）先标记过就不再覆盖。
+    if (latest.killedBy === null) {
+      ctx.deps.repos.runs.update(latest.id, { killedBy: "cancel" });
+    }
     if (latest.pid !== null) {
       try {
         await ctx.deps.host.kill(latest.pid);

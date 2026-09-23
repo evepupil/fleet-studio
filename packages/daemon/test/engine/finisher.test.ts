@@ -121,11 +121,33 @@ describe("finishRun：收尾（模块设计 3.7）", () => {
     expect(calls).toBeGreaterThan(0);
   });
 
-  it("非法的状态流转会抛 FleetError，不会把库改成一半", async () => {
+  it("已经是终态：直接返回 false，不报错、不再改库（评审 F4：重读优先于调用方传入的旧状态）", async () => {
     const { worker, run } = seedRunningRun(engine, {
       status: "completed",
       endedAt: "2026-01-01T00:00:05.000Z",
     });
+    const before = engine.repos.runs.get(run.id);
+
+    const finished = await finishRun(engine.ctx, {
+      run,
+      worker,
+      outcome: { status: "completed", failReason: null, message: null },
+      exitCode: 0,
+      usage: run.usage,
+      activity: run.activity,
+      finalText: run.finalText,
+      eventCount: run.eventCount,
+    });
+
+    expect(finished).toBe(false);
+    expect(engine.repos.runs.get(run.id)).toEqual(before);
+    expect(
+      engine.logger.records.some((r) => r.level === "info" && r.message.includes("completed")),
+    ).toBe(true);
+  });
+
+  it("非法的状态流转（排队中直接判完成）仍然会抛 FleetError", async () => {
+    const { worker, run } = seedRunningRun(engine, { status: "queued" });
 
     await expect(
       finishRun(engine.ctx, {
@@ -139,6 +161,40 @@ describe("finishRun：收尾（模块设计 3.7）", () => {
         eventCount: run.eventCount,
       }),
     ).rejects.toBeInstanceOf(FleetError);
+  });
+
+  it("expectedStatus 不匹配（重读到的状态已经变了）：放弃收尾，返回 false", async () => {
+    const { worker, run } = seedRunningRun(engine, { status: "running" });
+
+    const finished = await finishRun(engine.ctx, {
+      run,
+      worker,
+      outcome: { status: "failed", failReason: "runtime_error", message: "坏了" },
+      exitCode: 1,
+      usage: run.usage,
+      activity: run.activity,
+      finalText: run.finalText,
+      eventCount: run.eventCount,
+      expectedStatus: "queued", // 实际是 running，不符合期望
+    });
+
+    expect(finished).toBe(false);
+    expect(engine.repos.runs.get(run.id)?.status).toBe("running");
+  });
+
+  it("finishRun 成功收尾时返回 true", async () => {
+    const { worker, run } = seedRunningRun(engine);
+    const finished = await finishRun(engine.ctx, {
+      run,
+      worker,
+      outcome: { status: "completed", failReason: null, message: null },
+      exitCode: 0,
+      usage: run.usage,
+      activity: run.activity,
+      finalText: "完成",
+      eventCount: run.eventCount,
+    });
+    expect(finished).toBe(true);
   });
 });
 

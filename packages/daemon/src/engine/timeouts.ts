@@ -48,6 +48,11 @@ async function handleExpired(
     if (run.pid === null) {
       return; // 还在启动，拿不到进程号：这一轮跳过，下一轮再检查
     }
+    // 评审 F3：谁先写 killedBy 谁算——重读到这里还没有 await，run 仍然是新鲜的；
+    // 已经有别的路径（比如取消）先标记过就不再覆盖，也不用再抢着结束进程。
+    if (run.killedBy !== null) {
+      return;
+    }
     ctx.deps.repos.runs.update(run.id, { killedBy: "timeout" });
     await ctx.deps.host.kill(run.pid);
     return;
@@ -59,6 +64,9 @@ async function handleExpired(
     return;
   }
   const minutes = queueTimeoutMinutesLabel(run.queueTimeoutMs ?? 0);
+  // 评审 F1：这一轮开头算出的「谁排队超时了」是一份快照，处理同一轮里前面的运行时
+  // 这次运行可能已经被放行成工作中——finishRun 会重读库并核对 expectedStatus，
+  // 状态不再是 "queued" 就会放弃收尾，不会把正在跑的运行错杀成 queue_timeout。
   await finishRun(ctx, {
     run,
     worker,
@@ -68,5 +76,6 @@ async function handleExpired(
     activity: run.activity,
     finalText: run.finalText,
     eventCount: run.eventCount,
+    expectedStatus: "queued",
   });
 }
