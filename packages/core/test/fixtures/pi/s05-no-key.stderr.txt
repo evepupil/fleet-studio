@@ -1,0 +1,5 @@
+No API key found for mcgrox.
+
+Use /login to log into a provider via OAuth or API key. See:
+  C:\Users\zhoutao\AppData\Roaming\npm\node_modules\@earendil-works\pi-coding-agent\docs\providers.md
+  C:\Users\zhoutao\AppData\Roaming\npm\node_modules\@earendil-works\pi-coding-agent\docs\models.md
