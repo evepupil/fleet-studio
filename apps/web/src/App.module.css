@@ -1,0 +1,63 @@
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--bg-page);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.body[data-offline="true"] {
+  opacity: 0.6;
+}
+
+/* CapacityStrip 是别的目录写的组件，不接收 className，只能靠它自己的 data-capacity 标记选中。 */
+.body > [data-capacity] {
+  flex: none;
+}
+
+.main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background-color: var(--bg-panel);
+  border-right: 1px solid var(--line);
+}
+
+.detail {
+  min-height: 0;
+  overflow-y: auto;
+  background-color: var(--bg-panel);
+}
+
+.emptyMain {
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 1023px) {
+  .main {
+    grid-template-columns: 1fr;
+  }
+
+  .main[data-has-selection="true"] .sidebar {
+    display: none;
+  }
+
+  .main[data-has-selection="false"] .detail {
+    display: none;
+  }
+}

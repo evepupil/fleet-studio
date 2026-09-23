@@ -1,0 +1,22 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--appbar-h);
+  padding: 0 var(--sp-4);
+  background-color: var(--bg-page);
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.mark {
+  flex: none;
+}
+
+.name {
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+  letter-spacing: 0.2px;
+}

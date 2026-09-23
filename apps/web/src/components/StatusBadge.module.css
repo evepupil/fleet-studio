@@ -1,0 +1,44 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  white-space: nowrap;
+}
+
+.root[data-size="sm"] {
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.root[data-size="md"] {
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.iconSlot {
+  display: inline-flex;
+  align-items: center;
+}
+
+.spin {
+  animation: fs-spin 1.2s linear infinite;
+}
+
+.reducedDot {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    display: none;
+    animation: none;
+  }
+
+  .reducedDot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--st-running);
+  }
+}

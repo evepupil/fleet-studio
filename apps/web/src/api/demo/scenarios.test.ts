@@ -70,7 +70,9 @@ describe("演示场景 busy", () => {
 
   it("项目计数与苦工列表一致", () => {
     for (const project of scenario.snapshot.projects) {
-      const workers = scenario.snapshot.workers.filter((worker) => worker.projectKey === project.key);
+      const workers = scenario.snapshot.workers.filter(
+        (worker) => worker.projectKey === project.key,
+      );
       const total = Object.values(project.counts).reduce((sum, count) => sum + count, 0);
       expect(total).toBe(workers.length);
     }
@@ -97,7 +99,9 @@ describe("其余演示场景", () => {
   it("offline：连接最终断开，数据同 busy", () => {
     const offline = buildDemoScenario("offline");
     expect(offline.connection).toBe("lost");
-    expect(offline.snapshot.workers).toHaveLength(buildDemoScenario("busy").snapshot.workers.length);
+    expect(offline.snapshot.workers).toHaveLength(
+      buildDemoScenario("busy").snapshot.workers.length,
+    );
   });
 
   it("场景清单完整", () => {

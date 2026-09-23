@@ -1,0 +1,12 @@
+.root {
+  display: block;
+  background-color: var(--bg-hover);
+}
+
+.root[data-radius="sm"] {
+  border-radius: var(--r-sm);
+}
+
+.root[data-radius="md"] {
+  border-radius: var(--r-md);
+}
