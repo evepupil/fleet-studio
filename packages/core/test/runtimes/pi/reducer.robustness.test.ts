@@ -20,6 +20,38 @@ describe("pi reducer：健壮性（非 JSON / 坏 JSON / 空行）", () => {
     expect(reducer.progress().plainOutputTail).toBe("No API key found for mcgrox.");
   });
 
+  it("pi 新建会话的提示行整行忽略：不产出事件，状态跟没收到这行一样（D7）", () => {
+    const reducer = createPiReducer();
+    const before = reducer.progress();
+    const noticeLine =
+      "Warning: No project session found with id 'fleet-w12345'; creating a new session with that id.";
+    const drafts = feedLines(reducer, [noticeLine], "stderr", DEFAULT_AT);
+    expect(drafts).toEqual([]);
+    expect(reducer.progress()).toEqual(before);
+    expect(reducer.progress().plainOutputTail).toBeNull();
+  });
+
+  it("新建会话提示行首尾带空白也能识别；和一条真正的错误提示一起出现时，plainOutputTail 只含真正的错误（D7）", () => {
+    const reducer = createPiReducer();
+    const noticeLine =
+      "  Warning: No project session found with id 'fleet-w12345'; creating a new session with that id.  ";
+    const drafts = feedLines(
+      reducer,
+      [noticeLine, "Real error: something actually broke"],
+      "stderr",
+      DEFAULT_AT,
+    );
+    expect(drafts).toEqual([
+      {
+        kind: "output",
+        at: DEFAULT_AT,
+        stream: "stderr",
+        text: "Real error: something actually broke",
+      },
+    ]);
+    expect(reducer.progress().plainOutputTail).toBe("Real error: something actually broke");
+  });
+
   it("是合法 JSON 但不是「带字符串 type 字段的对象」：同样按 output 处理", () => {
     const reducer = createPiReducer();
     const drafts = feedLines(reducer, ['{"foo":1}', "[1,2,3]", "42"], "stdout", DEFAULT_AT);

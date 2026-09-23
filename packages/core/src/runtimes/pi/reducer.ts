@@ -34,6 +34,18 @@ export const PI_MAX_CONSECUTIVE_FAILURES = 8;
 const RAW_OUTPUT_TAIL_LINES = 5;
 const RAW_OUTPUT_TAIL_CHARS = 500;
 
+/**
+ * pi 首次用 --session-id 拉起一个还不存在的会话时，会在 stderr 打这一行提示，
+ * 纯粹是正常现象、不是错误：整行忽略，不产出事件也不计入原始输出尾巴，避免
+ * resolveRunOutcome 把这句无关提示当成失败说明（D7）。只识别这一种，其余非 JSON
+ * 行照旧按 output 处理。
+ */
+const NEW_SESSION_NOTICE_PREFIX = "Warning: No project session found with id";
+
+function isNewSessionNotice(line: string): boolean {
+  return line.trim().startsWith(NEW_SESSION_NOTICE_PREFIX);
+}
+
 /** pi 事件流的解析状态机：一次运行一个实例。 */
 class PiStreamReducer implements StreamReducer {
   #sessionRef: string | null = null;
@@ -56,6 +68,9 @@ class PiStreamReducer implements StreamReducer {
 
   push(line: string, stream: OutputStream, at: string): TimelineDraft[] {
     if (line.trim() === "") {
+      return [];
+    }
+    if (isNewSessionNotice(line)) {
       return [];
     }
 
