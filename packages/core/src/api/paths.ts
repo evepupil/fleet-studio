@@ -8,6 +8,8 @@ export const API_PATHS = {
   wait: "/api/wait",
   pools: "/api/pools",
   roles: "/api/roles",
+  /** 让服务优雅退出（带令牌） */
+  shutdown: "/api/shutdown",
   worker: (id: string) => `/api/workers/${encodeURIComponent(id)}`,
   workerTimeline: (id: string) => `/api/workers/${encodeURIComponent(id)}/timeline`,
   /** SSE：单个苦工的时间线增量与详情变化 */
