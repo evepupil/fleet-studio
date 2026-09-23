@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { API_PATHS } from "@fleet/core";
@@ -127,7 +127,14 @@ export async function ensureDaemon(home: string, env: NodeJS.ProcessEnv): Promis
   }
 
   const entry = resolveDaemonEntry(env);
+  // 数据目录可能是第一次用（还没建过），先确保它存在再把它当子进程的 cwd。
+  await mkdir(home, { recursive: true });
+  // 不指定 cwd 时子进程会继承命令行这一侧的工作目录（通常就是主会话所在的项目目录）：
+  // 服务是长驻进程，Windows 下进程占着的目录删不掉、改不了名，只要服务还在跑，
+  // 第一个拉起它的项目文件夹就会一直被占住（缺陷 10）。把 cwd 定死成数据目录，
+  // 跟命令行是从哪个项目目录发起拉起的完全脱钩。
   const child = spawn(process.execPath, [entry, "--home", home], {
+    cwd: home,
     detached: true,
     windowsHide: true,
     stdio: "ignore",

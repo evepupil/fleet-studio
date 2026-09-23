@@ -1,4 +1,5 @@
-import { writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
@@ -17,14 +18,17 @@ let stub: StubServer | undefined;
 let spawnedDaemonPid: number | undefined;
 
 afterEach(async () => {
-  await home?.cleanup();
-  home = undefined;
-  await stub?.close();
-  stub = undefined;
+  // 先杀假服务进程再删它的数据目录：缺陷 10 修好之后这个目录是子进程的 cwd，
+  // 顺序反了在 Windows 上会删不掉（EBUSY），tempHome.cleanup() 的重试只是兜底，
+  // 该杀的进程还是要先杀。
   if (spawnedDaemonPid !== undefined) {
     killIfAlive(spawnedDaemonPid);
     spawnedDaemonPid = undefined;
   }
+  await home?.cleanup();
+  home = undefined;
+  await stub?.close();
+  stub = undefined;
 });
 
 describe("findRunningDaemon", () => {
@@ -114,6 +118,41 @@ describe("ensureDaemon", () => {
 
     const probedAgain = await findRunningDaemon(home.path);
     expect(probedAgain?.baseUrl).toBe(handle.baseUrl);
+  });
+
+  it("拉起时子进程的工作目录钉死成数据目录，不会占住调用方所在的项目目录（缺陷 10）", async () => {
+    home = await createTempHome();
+    const handle = await ensureDaemon(home.path, { FLEET_DAEMON_ENTRY: FAKE_DAEMON_ENTRY });
+    spawnedDaemonPid = handle.info.pid;
+
+    const spawnCwd = await readFile(join(home.path, "spawn-cwd.txt"), "utf8");
+    expect(spawnCwd).toBe(home.path);
+    // 用测试进程自己的 cwd 反证一下：数据目录不应该等于调用方（这里是测试进程）的工作目录，
+    // 不然上面这条断言就算「凑巧」成立，没验证到东西。
+    expect(spawnCwd).not.toBe(process.cwd());
+  });
+
+  it("数据目录还不存在时也能正常拉起（缺陷 10：spawn 的 cwd 指向不存在的目录会直接失败，得先建目录）", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "fleet-cli-test-parent-"));
+    const notYetCreatedHome = join(parent, "not-created-yet");
+
+    try {
+      const handle = await ensureDaemon(notYetCreatedHome, {
+        FLEET_DAEMON_ENTRY: FAKE_DAEMON_ENTRY,
+      });
+      spawnedDaemonPid = handle.info.pid;
+      expect(handle.info.home).toBe(notYetCreatedHome);
+      const spawnCwd = await readFile(join(notYetCreatedHome, "spawn-cwd.txt"), "utf8");
+      expect(spawnCwd).toBe(notYetCreatedHome);
+    } finally {
+      // 这里的目录是 parent（比 notYetCreatedHome 高一层），afterEach 的 killIfAlive 还没跑到，
+      // 子进程这时候还占着 notYetCreatedHome 当 cwd：先在这个 finally 里自己杀掉再删，
+      // 不然跟通用的 tempHome 一样会碰到 EBUSY；afterEach 里再杀一次是安全的空操作。
+      if (spawnedDaemonPid !== undefined) {
+        killIfAlive(spawnedDaemonPid);
+      }
+      await rm(parent, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    }
   });
 
   it("拉起失败（8 秒内探活始终不通）时抛 CliConnectionError，并提示日志路径", async () => {

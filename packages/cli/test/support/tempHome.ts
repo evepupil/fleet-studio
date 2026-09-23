@@ -26,7 +26,9 @@ export async function createTempHome(): Promise<TempHome> {
       await writeFile(join(path, "daemon.json"), JSON.stringify(info), "utf8");
     },
     async cleanup(): Promise<void> {
-      await rm(path, { recursive: true, force: true });
+      // 缺陷 10 修好之后，拉起的假服务子进程的 cwd 就是这个目录：进程刚被杀掉时，Windows
+      // 释放目录句柄可能还差那么几十毫秒，直接删会碰到 EBUSY。带重试删，给它一点缓冲时间。
+      await rm(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     },
   };
 }

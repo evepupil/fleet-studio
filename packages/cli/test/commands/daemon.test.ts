@@ -29,16 +29,18 @@ let stub: StubServer | undefined;
 let spawnedDaemonPid: number | undefined;
 
 afterEach(async () => {
+  // 先杀假服务进程再删数据目录：缺陷 10 修好之后这个目录是子进程的 cwd，顺序反了
+  // 在 Windows 上会删不掉（EBUSY）。
+  if (spawnedDaemonPid !== undefined) {
+    killIfAlive(spawnedDaemonPid);
+    spawnedDaemonPid = undefined;
+  }
   await harness?.cleanup();
   harness = undefined;
   await home?.cleanup();
   home = undefined;
   await stub?.close();
   stub = undefined;
-  if (spawnedDaemonPid !== undefined) {
-    killIfAlive(spawnedDaemonPid);
-    spawnedDaemonPid = undefined;
-  }
 });
 
 describe("runDaemonCommand status", () => {

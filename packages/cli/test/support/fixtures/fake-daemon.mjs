@@ -49,4 +49,7 @@ server.listen(0, "127.0.0.1", () => {
     home,
   };
   writeFileSync(join(home, "daemon.json"), JSON.stringify(daemonInfo), "utf8");
+  // 记下真正拉起时子进程的工作目录：spawn 不传 cwd 时会继承调用方的工作目录（缺陷 10 的
+  // 复现方式），测试拿这个文件的内容和 --home 参数比对，就知道 cwd 有没有被钉死成数据目录。
+  writeFileSync(join(home, "spawn-cwd.txt"), process.cwd(), "utf8");
 });
