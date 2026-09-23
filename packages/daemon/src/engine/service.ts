@@ -47,7 +47,12 @@ export interface FleetService {
    * 超过 timeoutMs 或 signal 触发时返回当前情况（timedOut 为 true）。
    * 不存在的编号抛 FleetError("not_found")。
    */
-  wait(ids: readonly string[], mode: WaitMode, timeoutMs: number, signal: AbortSignal): Promise<WaitResult>;
+  wait(
+    ids: readonly string[],
+    mode: WaitMode,
+    timeoutMs: number,
+    signal: AbortSignal,
+  ): Promise<WaitResult>;
   pools(): PoolView[];
   patchPool(id: string, patch: PoolPatch): Promise<PoolView>;
   roles(): RoleView[];
