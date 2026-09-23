@@ -1,0 +1,25 @@
+# 依赖与构建产物
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# 本地临时产物（调研样本、截图、苦工输出）
+.scratch/
+.fleet/
+
+# CodeGraph 索引只留本机
+.codegraph/*
+!.codegraph/.gitignore
+
+# 编辑器与系统
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# 环境变量
+.env
+.env.*
+!.env.example
