@@ -28,7 +28,12 @@ export async function createTempHome(): Promise<TempHome> {
     async cleanup(): Promise<void> {
       // 缺陷 10 修好之后，拉起的假服务子进程的 cwd 就是这个目录：进程刚被杀掉时，Windows
       // 释放目录句柄可能还差那么几十毫秒，直接删会碰到 EBUSY。带重试删，给它一点缓冲时间。
-      await rm(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      // 重试用完还是删不掉的话，收尾是尽力而为，不能让测试跟着失败，但也不能静默吞掉。
+      try {
+        await rm(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      } catch (error) {
+        console.warn(`删除临时目录失败（可能是系统占用），忽略：${path}`, error);
+      }
     },
   };
 }

@@ -62,7 +62,12 @@ async function createHarness(overrides: Partial<EngineDeps> = {}): Promise<Harne
     async cleanup(): Promise<void> {
       repos.close();
       // 见 support/testEngine.ts 的同一处注释：fire-and-forget 的放行/启动可能还没写完文件。
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+      // 重试用完还是删不掉的话，收尾是尽力而为，不能让测试跟着失败，但也不能静默吞掉。
+      try {
+        await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+      } catch (error) {
+        console.warn(`删除临时目录失败（可能是系统占用），忽略：${home}`, error);
+      }
     },
   };
 }

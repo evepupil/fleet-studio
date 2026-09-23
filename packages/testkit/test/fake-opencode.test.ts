@@ -51,7 +51,12 @@ describe("fake-opencode：success / model-error / no-key / crash", () => {
   });
 
   afterEach(() => {
-    rmSync(traceDir, { recursive: true, force: true });
+    // 收尾是尽力而为：删不掉不能让测试跟着失败，但也不能静默吞掉，打一行警告方便发现。
+    try {
+      rmSync(traceDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch (error) {
+      console.warn(`删除临时目录失败（可能是系统占用），忽略：${traceDir}`, error);
+    }
   });
 
   it("success：解析出的进展 outcome 是已完成，退出码 0，会话编号取自 --session", async () => {

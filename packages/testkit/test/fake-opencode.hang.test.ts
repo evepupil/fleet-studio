@@ -34,7 +34,12 @@ describe("fake-opencode：hang / retry-storm（等同 hang）/ spawn-child-hang"
   });
 
   afterEach(() => {
-    rmSync(traceDir, { recursive: true, force: true });
+    // 收尾是尽力而为：删不掉不能让测试跟着失败，但也不能静默吞掉，打一行警告方便发现。
+    try {
+      rmSync(traceDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch (error) {
+      console.warn(`删除临时目录失败（可能是系统占用），忽略：${traceDir}`, error);
+    }
   });
 
   it("hang：只输出 step_start 就永久等待，1 秒内不退出，测完手动结束", async () => {

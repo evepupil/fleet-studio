@@ -139,8 +139,13 @@ export async function createTestEngine(options: CreateTestEngineOptions = {}): P
       repos.close();
       // 有些用例触发的放行/启动是「发出去不等」的（dispatcher 用 setImmediate 合并请求），
       // 测试函数本身返回时那些异步操作可能还没写完文件；Windows 上删除目录跟正在写的文件
-      // 撞到一起会报 ENOTEMPTY/EBUSY，用 fs.rm 内置的重试退避几次就稳了。
-      await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+      // 撞到一起会报 ENOTEMPTY/EBUSY，用 fs.rm 内置的重试退避几次就稳了。重试用完还是
+      // 删不掉的话，收尾是尽力而为，不能让测试跟着失败，但也不能静默吞掉，打一行警告。
+      try {
+        await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+      } catch (error) {
+        console.warn(`删除临时目录失败（可能是系统占用），忽略：${home}`, error);
+      }
     },
   };
 }

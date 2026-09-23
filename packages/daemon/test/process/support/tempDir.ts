@@ -9,7 +9,13 @@ export async function createTempDir(prefix: string): Promise<string> {
 }
 
 export async function removeTempDir(dir: string): Promise<void> {
-  await rm(dir, { recursive: true, force: true });
+  // 收尾是尽力而为：删不掉不能让测试因为这个跟业务逻辑无关的系统时序问题变红，
+  // 但也不能静默吞掉，打一行警告方便事后发现真的删不掉的目录。
+  try {
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  } catch (error) {
+    console.warn(`删除临时目录失败（可能是系统占用），忽略：${dir}`, error);
+  }
 }
 
 /** 建好父目录再写文本文件，测试里经常要在临时目录深处放一个文件。 */

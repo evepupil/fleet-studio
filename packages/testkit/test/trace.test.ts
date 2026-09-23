@@ -23,7 +23,12 @@ describe("readTrace：解析轨迹文件", () => {
   });
 
   afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+    // 收尾是尽力而为：删不掉不能让测试跟着失败，但也不能静默吞掉，打一行警告方便发现。
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch (error) {
+      console.warn(`删除临时目录失败（可能是系统占用），忽略：${dir}`, error);
+    }
   });
 
   it("start 行带 args 和轨迹编号，end 行不带 args 但带同一个轨迹编号；空行跳过", () => {

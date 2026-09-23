@@ -151,7 +151,12 @@ describe("ensureDaemon", () => {
       if (spawnedDaemonPid !== undefined) {
         killIfAlive(spawnedDaemonPid);
       }
-      await rm(parent, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      // 收尾是尽力而为：删不掉不能让测试跟着失败，但也不能静默吞掉，打一行警告方便发现。
+      try {
+        await rm(parent, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      } catch (error) {
+        console.warn(`删除临时目录失败（可能是系统占用），忽略：${parent}`, error);
+      }
     }
   });
 

@@ -1,4 +1,5 @@
 import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { request as httpRequest, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -61,6 +62,10 @@ export interface TestServer {
 export async function startTestServer(webDistDir?: string): Promise<TestServer> {
   const service = createFakeService();
   const token = TEST_TOKEN;
+  // 没传 webDistDir 时自己建一个临时目录：这份目录只有这次调用自己在用，
+  // close() 里必须自己删掉，不然会在系统临时目录里越攒越多（调用方传了目录进来的情况，
+  // 目录的生命周期归调用方管，这里不能删）。
+  const ownsWebDistDir = webDistDir === undefined;
   const resolvedWebDistDir = webDistDir ?? mkdtempSync(join(tmpdir(), "fleet-http-test-"));
   // port 要等 startHttpServer resolve 之后才知道；getPort 用闭包延迟读取，
   // 和生产代码里“端口传 0 由系统分配”的场景完全一致。
@@ -90,7 +95,23 @@ export async function startTestServer(webDistDir?: string): Promise<TestServer> 
         headers: { ...init.headers, "x-fleet-token": token },
       }),
     rawRequest: (options) => sendRawRequest(port, options),
-    close: () => handle.close(),
+    close: async () => {
+      await handle.close();
+      if (!ownsWebDistDir) {
+        return;
+      }
+      // 收尾是尽力而为：删不掉不能让测试跟着失败，但也不能静默吞掉，打一行警告方便发现。
+      try {
+        await rm(resolvedWebDistDir, {
+          recursive: true,
+          force: true,
+          maxRetries: 5,
+          retryDelay: 100,
+        });
+      } catch (error) {
+        console.warn(`删除临时目录失败（可能是系统占用），忽略：${resolvedWebDistDir}`, error);
+      }
+    },
   };
 }
 

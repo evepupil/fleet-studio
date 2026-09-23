@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -18,6 +19,14 @@ describe("看板静态文件", () => {
 
   afterEach(async () => {
     await server.close();
+    // 这里的用例都显式传了 webDistDir（startTestServer 只会自动删「自己建的」那份），
+    // 目录的生命周期归这个文件自己管；server.webDistDir 就是 createWebDist()/内联
+    // mkdtempSync 建出来的那个目录，统一在这里删掉，不留垃圾在系统临时目录里。
+    try {
+      await rm(server.webDistDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch (error) {
+      console.warn(`删除临时目录失败（可能是系统占用），忽略：${server.webDistDir}`, error);
+    }
   });
 
   it("命中 assets/ 下的文件：正确的 Content-Type，并加长期缓存", async () => {
