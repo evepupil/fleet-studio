@@ -9,6 +9,16 @@ import type { ParsedReport, ReportSection, Verdict } from "../domain/report.js";
 const SECTION_HEADER_PATTERN =
   /^\s*(?:#{1,6}\s+|-\s+)?\*{0,2}([A-Z][A-Z_]{1,31})\*{0,2}:\*{0,2}\s?(.*)$/;
 
+/**
+ * 只有段名、没有冒号的整行：真实模型经常把段名单独写一行再加粗或加标题号，
+ * 内容从下一行开始（2026-09-24 端到端验收发现，见模块设计 3.2 节第三条）。
+ * `**KEY**` 和 `__KEY__` 要求首尾用同一种符号包住，靠反向引用保证成对。
+ */
+const BOLD_ONLY_HEADER_PATTERN = /^\s*(\*\*|__)([A-Z][A-Z_]{1,31})\1\s*$/;
+
+/** 只有段名、用标题号开头的整行（# 到 ######），同样没有冒号，内容从下一行开始。 */
+const HEADING_ONLY_HEADER_PATTERN = /^\s*#{1,6}\s+([A-Z][A-Z_]{1,31})\s*$/;
+
 interface SectionHeader {
   key: string;
   rest: string;
@@ -19,10 +29,22 @@ function matchSectionHeader(line: string): SectionHeader | null {
   const match = SECTION_HEADER_PATTERN.exec(line);
   const key = match?.[1];
   const rest = match?.[2];
-  if (key === undefined || rest === undefined) {
-    return null;
+  if (key !== undefined && rest !== undefined) {
+    return { key, rest };
   }
-  return { key, rest };
+
+  // 既没有装饰也没有冒号的单独大写词（例如一行只有 OK）不算段名，
+  // 所以这两条只有段名的规则都要求装饰（粗体或标题号），不认裸词。
+  const boldOnlyKey = BOLD_ONLY_HEADER_PATTERN.exec(line)?.[2];
+  if (boldOnlyKey !== undefined) {
+    return { key: boldOnlyKey, rest: "" };
+  }
+  const headingOnlyKey = HEADING_ONLY_HEADER_PATTERN.exec(line)?.[1];
+  if (headingOnlyKey !== undefined) {
+    return { key: headingOnlyKey, rest: "" };
+  }
+
+  return null;
 }
 
 /**

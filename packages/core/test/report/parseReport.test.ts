@@ -40,6 +40,63 @@ describe("parseReport", () => {
     ]);
   });
 
+  it("只有段名、没有冒号的标题行也要认，内容从下一行开始（真实模型常见写法）", () => {
+    const text = [
+      "**FINDINGS**",
+      "",
+      "- `packages/` 下有 4 个包：`cli`、`core`、`daemon`、`testkit`。",
+      "- ...",
+      "",
+      "**EVIDENCE**",
+      "",
+      "- 目录清单：...",
+      "",
+      "**GAPS**",
+      "",
+      "- 无",
+    ].join("\n");
+
+    const report = parseReport(text);
+
+    expect(report?.sections.map((section) => section.key)).toEqual([
+      "FINDINGS",
+      "EVIDENCE",
+      "GAPS",
+    ]);
+    expect(report?.sections).toEqual([
+      {
+        key: "FINDINGS",
+        text: "- `packages/` 下有 4 个包：`cli`、`core`、`daemon`、`testkit`。\n- ...",
+      },
+      { key: "EVIDENCE", text: "- 目录清单：..." },
+      { key: "GAPS", text: "- 无" },
+    ]);
+  });
+
+  it("只有段名的标题行也支持 __KEY__ 和三级标题号 ### KEY", () => {
+    expect(parseReport("__FINDINGS__\n内容")?.sections).toEqual([
+      { key: "FINDINGS", text: "内容" },
+    ]);
+    expect(parseReport("### FINDINGS\n内容")?.sections).toEqual([
+      { key: "FINDINGS", text: "内容" },
+    ]);
+  });
+
+  it("只有标题号 + 段名的行也认，段内容从下一行开始，可以直接算出 verdict", () => {
+    const text = "## VERDICT\npass";
+
+    expect(parseReport(text)?.sections).toEqual([{ key: "VERDICT", text: "pass" }]);
+    expect(parseReport(text)?.verdict).toBe("pass");
+  });
+
+  it("既没有装饰也没有冒号的单独大写词不算段名，不会被切成新段", () => {
+    const text = "SUMMARY: 正文第一行\nOK\n正文接着写";
+
+    const report = parseReport(text);
+
+    expect(report?.sections).toEqual([{ key: "SUMMARY", text: "正文第一行\nOK\n正文接着写" }]);
+  });
+
   it("段内多行文字保留内部换行，首尾空白去掉", () => {
     const text = "SUMMARY: 第一行  \n第二行\n第三行\n";
 
