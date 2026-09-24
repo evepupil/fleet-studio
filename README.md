@@ -14,9 +14,25 @@
 pnpm install
 pnpm build
 node scripts/install-shims.mjs      # 把 fleet 命令装进 npm 全局目录（已在 PATH 中）
+node scripts/install-skills.mjs     # 把 fleet 系列 skill 装进 Claude Code（--target codex|all 装 Codex 或两边）
 ```
 
-卸载命令外壳：`node scripts/install-shims.mjs --uninstall`。
+卸载命令外壳：`node scripts/install-shims.mjs --uninstall`。skill 的检查与卸载见下一节。
+
+## fleet 系列 skill
+
+主会话靠这几份 skill 学会怎么经 fleet 派活，源文件在 `skills/`：
+
+| skill | 干啥 |
+|---|---|
+| `fleet-dispatch` | 派活的基础规矩：什么活外包、用便宜模型还是强模型、怎么派、怎么验、怎么记进度 |
+| `fleet-project-build` | 设计定稿后按里程碑无人值守开发到底 |
+| `fleet-ui-build` | 把界面从分层规格做成页面，带截图和交互验收工具 |
+| `fleet-review` | 按提交区间派评审、记进 `docs/review/`，以及照账修复、销账 |
+| `fleet-ops` | 维护调度站：服务、池子、角色、运行时、排障 |
+
+- 安装会把被取代的旧 skill（pi-fleet、oc-fleet、fleet-build、ui-build、auto-delegate）挪进 `~/.fleet-studio/skill-backup/`；`node scripts/install-skills.mjs --uninstall` 删掉新的、挪回旧的。
+- `node scripts/install-skills.mjs --check` 查装上的和仓库里是否一致。改了 `skills/` 要重新安装，新开的会话才用上新版本。
 
 ## 主会话怎么用
 
