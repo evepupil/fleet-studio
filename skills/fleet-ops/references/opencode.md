@@ -1,6 +1,15 @@
 # opencode 运行时
 
-fleet 的备选苦工运行时，派活时加 `--runtime opencode`，池配置里要写了 opencode 的模型。调研原文在 `C:\code\fleet-studio\docs\调研\opencode-运行时.md`。
+**2026-09-24 起停用。** 资源占用是 pi 的好几倍，池配置里撤掉了 opencode 的模型，主会话点名也派不出去；Codex 里旧的 oc-fleet 也挪进了备份。用户明确要用时，给对应的池加回一项再派（加 `--runtime opencode`），例如 dsf 原来写的是：
+
+```json
+"runtimes": {
+  "pi": { "provider": "mcgrox", "model": "deepseek-v4.1-flash" },
+  "opencode": { "model": "mcgrox/deepseek-v4.1-flash" }
+}
+```
+
+opencode 还能多写一个 `variant` 调推理档位。调研原文在 `C:\code\fleet-studio\docs\调研\opencode-运行时.md`。
 
 ## 什么时候用
 
@@ -13,7 +22,7 @@ fleet 的备选苦工运行时，派活时加 `--runtime opencode`，池配置�
 | 总耗时 | 15 秒 | 41 秒 |
 | 结果 | 10/10 | 10/10 |
 
-opencode 每路多起一个子进程，单个进程也重（约 580 MB 对 116 MB），答案质量抽查持平。只在用户点名、pi 装不上、或者要用 opencode 独有能力（内置 LSP、MCP、多模型分层）时用它。
+opencode 每路多起一个子进程，单个进程也重（约 580 MB 对 116 MB），答案质量抽查持平。所以停用，只有用户明确要用时才按开头的写法加回。
 
 ## 装配与自检
 

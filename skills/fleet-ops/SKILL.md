@@ -60,14 +60,13 @@ fleet pool set dsf --per-project 8   # 单个项目最多占 8 个；写 none �
   "runTimeoutMin": 60,
   "queueTimeoutMin": null,
   "runtimes": {
-    "pi": { "provider": "<pi 里的通道名>", "model": "<模型名>" },
-    "opencode": { "model": "<通道>/<模型名>" }
+    "pi": { "provider": "<pi 里的通道名>", "model": "<模型名>" }
   }
 }
 ```
 
 - `id` 以小写字母开头，只用小写字母、数字和短横线，最长 32 个字符。`capacity` 取 0～500，0 表示暂停放行。
-- `runtimes` 至少给一种。只给了 pi 的池，`--runtime opencode` 派不进去。opencode 还能多写一个 `variant` 调推理档位。
+- `runtimes` 只写 pi。opencode 已停用（第五节），池里不写它，`--runtime opencode` 就派不进去。
 - `runTimeoutMin`、`queueTimeoutMin` 写 null 就沿用全局默认（`defaults` 里：运行 30 分钟，排队不限时）。默认池在 `defaults.pool`。
 - **容量怎么定**：同一时刻打出 N 个带工具的请求，一档一档往上加，每次都全过的最高档就是并发上限；容量取上限打八折，再按这个路数连续压一两分钟确认不掉。数字记进 `references/pi.md`。加并发不会让活变快：通道吞吐是固定的，多开的只是排队。
 - **配置写坏了**：服务继续用上一份有效配置，看板顶部会提示错在哪，`daemon.log` 里也有。
@@ -106,7 +105,7 @@ fleet pool set dsf --per-project 8   # 单个项目最多占 8 个；写 none �
 | 资源 | 每路约 110 MB | 每路约 580 MB，CPU 约 9 倍 |
 | 续接 | 服务用苦工编号给会话起名，天然对得上 | 第一次运行后从输出里取会话号 |
 | 推理档位 | `--thinking` 生效；不指定时用 pi 的全局设置（已设为 max） | 不认 `--thinking`，用池配置里的 `variant` |
-| 什么时候用 | 默认 | 用户点名、pi 装不上、要用 opencode 独有能力（内置 LSP、MCP） |
+| 什么时候用 | 一律用它 | 已停用：池子里都没配 opencode 的模型，点名也派不出去。用户明确要用时，才给对应的池加回（写法见 `references/opencode.md` 开头） |
 
 - 可执行文件自动探测；要指定就改 `config.json` 的 `runtimes.pi.command` 或 `runtimes.opencode.command`（写成数组：可执行文件加前置参数）。
 - pi 碰到通道持续报错会无限重试、自己不退出。服务在连续 8 次请求失败（约 40 秒）时判「模型或通道出错」并结束进程。
