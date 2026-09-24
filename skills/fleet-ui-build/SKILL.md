@@ -1,6 +1,6 @@
 ---
 name: fleet-ui-build
-description: 把前端页面真正做出来的流程：主控分两层写满规格——先写站点层（页面清单、设计令牌、共享组件、数据），再逐页写页面层（每个区块写到元素和数字），数据先编；然后经 fleet 派多路苦工按页并行照抄，最后用门禁、设备仿真截图、交互状态截图和交互探针验收。单页落地页和多页整站都适用。当用户说「写个 landing page」「做这个产品的首页」「做一整个站」「照前端设计把页面做出来」「把界面做出来」「页面太空」「做出来像模板货 / 像大学生 demo」，或者需求、信息设计、视觉方向已经定了要落地成页面时使用。Spec-first UI build: one strong model writes a layered, number-level spec with data as code; workers dispatched through fleet transcribe it in parallel, one lane per page area; acceptance runs gates, device-emulated screenshots, state screenshots and interaction probes.
+description: 把前端页面真正做出来的流程：主控分两层写满规格——先写站点层（页面清单、设计令牌、共享组件、数据），再逐页写页面层（每个区块写到元素和数字），数据先编；然后经 fleet 派多路苦工按页并行照抄，最后用门禁、设备仿真截图、交互状态截图和交互探针验收。单页落地页和多页整站都适用。当用户说「写个 landing page」「做这个产品的首页」「做一整个站」「照前端设计把页面做出来」「把界面做出来」「页面太空」「做出来像模板货 / 像大学生 demo」，或者需求、页面清单、视觉方向已经定了要落地成页面时使用。Spec-first UI build: one strong model writes a layered, number-level spec with data as code; workers dispatched through fleet transcribe it in parallel, one lane per page area; acceptance runs gates, device-emulated screenshots, state screenshots and interaction probes.
 ---
 
 # fleet-ui-build
@@ -13,13 +13,12 @@ description: 把前端页面真正做出来的流程：主控分两层写满规�
 
 | skill | 管什么 |
 |---|---|
-| `info-design` | 减法：该不该有这个页面、这个区块 |
+| `fleet-discuss` | 设计阶段：功能清单、页面清单、视觉方向和 `docs/前端设计.md` 在那里定，本 skill 照着落地 |
 | `frontend-design` | 风格：颜色、字体、气质、别像模板货 |
 | **本 skill** | 加法与落地：把这类站该有的全摆上、写到数字、派人做出来、验收 |
 | `fleet-dispatch` | 派活规矩：苦工从哪来、fleet 命令、返工、验收、进度流水。本 skill 派的每一路都照它 |
-| `fleet-discuss` | 设计阶段：视觉方向和 `docs/前端设计.md` 在那里定，本 skill 照着落地 |
 
-前三者可以独立跑。手上没有前两者的产物也能用本 skill，站点层里的参照对象会替你补上骨架；手上有 info-design 的信息树，就拿它当页面清单和区块清单的底稿，页面层仍按参照站往上加满。
+手上没有 fleet-discuss 的产物也能用本 skill，站点层里的参照对象会替你补上骨架；有它定的页面清单，就拿来当页面和区块的底稿，页面层仍按参照站往上加满。
 
 ## 核心纪律：先扩散，再收敛
 
@@ -55,7 +54,7 @@ description: 把前端页面真正做出来的流程：主控分两层写满规�
 
 分层的好处：页面层直接站在站点层定好的令牌、组件、数据上写，不用再争；地基路只需要站点层，可以提前开工；每路苦工只读站点层加自己那一页，不用读全站所有页。
 
-**分层写，不拆给多人写。** 两层都由主控在同一个会话里依次写完，每一层都只做加法。info-design 那次把每一层拆给几十路便宜模型、各看一个节点，层与层之间还只做减法，结果越写越薄；这里要避开的正是这一点。实测四页的页面层一共写了 16 分钟，一个人写得过来。
+**分层写，不拆给多人写。** 两层都由主控在同一个会话里依次写完，每一层都只做加法。早先试过把每一层拆给几十路便宜模型、各看一个节点，层与层之间还只做减法，结果越写越薄；这里要避开的正是这一点。实测四页的页面层一共写了 16 分钟，一个人写得过来。
 
 单页站也分两层：站点层写短一点，页面层只有一个文件，模板和工具都不用变。
 
@@ -82,7 +81,7 @@ description: 把前端页面真正做出来的流程：主控分两层写满规�
 
 ### 第 2 步 主控写页面层（和地基同时进行）
 
-站点层一写完就派地基路（第 3 步），然后回来按 `templates/页面规格.md` 逐页写页面层。每个区块写七项：外层、每个元素、数据来源、交互、状态、响应式、文案。每页点明最重要的区块，允许它写得最长。每页末尾列一张「交互检查会找什么」的表，把要用的 `data-*`、`id`、按钮文字定死——几路苦工互相看不见，交互检查只能靠这些标记找元素。
+站点层一写完就派地基路（第 3 步），然后回来按 `templates/页面规格.md` 逐页写页面层。每个区块写七项：外层、每个元素、数据来源、交互、状态、响应式、文案。选组件先看 `references/常见组件.md` 有没有现成的，别自造。每页点明最重要的区块，允许它写得最长。每页末尾列一张「交互检查会找什么」的表，把要用的 `data-*`、`id`、按钮文字定死——几路苦工互相看不见，交互检查只能靠这些标记找元素。
 
 ### 第 3 步 一路搭地基，主控核对再放行
 

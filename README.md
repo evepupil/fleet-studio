@@ -22,11 +22,11 @@ node scripts/install-roles.mjs      # 把 roles/ 下的苦工提示词同步给 
 
 ## fleet 系列 skill
 
-主会话靠这几份 skill 学会怎么经 fleet 派活，源文件在 `skills/`：
+主会话靠这几份 skill 学会怎么谈设计、怎么经 fleet 派活，源文件在 `skills/`：
 
 | skill | 干啥 |
 |---|---|
-| `fleet-discuss` | 和用户把想法谈成设计文档：需求、技术、架构、前端方向、roadmap、模块设计；每轮只谈一小块，术语括号解释 |
+| `fleet-discuss` | 和用户把想法谈成设计文档：需求、功能清单、页面清单、视觉方向、技术、架构、roadmap；AI 列全，用户只管删改 |
 | `fleet-dispatch` | 派活的基础规矩：什么活外包、用便宜模型还是强模型、怎么派、怎么验、怎么记进度 |
 | `fleet-project-build` | 设计定稿后按里程碑无人值守开发到底 |
 | `fleet-ui-build` | 把界面从分层规格做成页面，带截图和交互验收工具 |
