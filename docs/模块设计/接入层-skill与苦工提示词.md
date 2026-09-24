@@ -1,11 +1,11 @@
 # 接入层 · skill 与苦工提示词
 
-> 模块定位：注入模型上下文的两类规矩——教主会话怎么经 fleet 派活的五份 skill，和苦工的五个角色提示词；以及把它们装进宿主的脚本 · 对应代码：`skills/`、`roles/`、`scripts/install-skills.mjs`、`scripts/install-roles.mjs`、`packages/cli/test/skills.test.ts` · 所属里程碑：[M4 fleet 系列 skill 与苦工提示词](../roadmap.md#m4) · 状态：进行中（skill 已装到 Claude Code、苦工提示词已切到仓库，等用户试用；Codex 未装）· 最近更新：2026-09-24
+> 模块定位：注入模型上下文的两类规矩——教主会话怎么谈设计、怎么经 fleet 派活的六份 skill，和苦工的五个角色提示词；以及把它们装进宿主的脚本 · 对应代码：`skills/`、`roles/`、`scripts/install-skills.mjs`、`scripts/install-roles.mjs`、`packages/cli/test/skills.test.ts` · 所属里程碑：[M4 fleet 系列 skill 与苦工提示词](../roadmap.md#m4) · 状态：进行中（skill 已装到 Claude Code、苦工提示词已切到仓库，等用户试用；Codex 未装）· 最近更新：2026-09-24
 
 ## 1. 职责与边界
 
 - **管：**
-  - 主会话这一侧的规矩：什么活外包、苦工从哪来、fleet 命令怎么用、任务书怎么写、怎么验收、进度怎么记；按里程碑开发、做界面、评审与销账三套流程；调度站的运维与排障。
+  - 主会话这一侧的规矩：怎么和用户谈设计、各类设计文档写什么；什么活外包、苦工从哪来、fleet 命令怎么用、任务书怎么写、怎么验收、进度怎么记；按里程碑开发、做界面、评审与销账三套流程；调度站的运维与排障。
   - 苦工这一侧的规矩：实现、侦察、评审、修复、测试五个角色的提示词正文和回报格式；opencode 三个 agent 的开头声明。
   - 安装：skill 装到 Claude Code 和 Codex，退役被取代的旧全局 skill；opencode 的 agent 从仓库提示词生成。
 - **不管：** 角色用哪份提示词、禁哪些工具（在配置里，默认值见[领域模型与配置](核心层-领域模型与配置.md) 4.2 节）；fleet 命令和服务本身的行为（skill 只描述用法，行为以命令行层和服务层为准）；codeg、Claude Code、Codex 自身的配置。
@@ -16,6 +16,7 @@
 
 | skill | 干啥 | 由哪份旧 skill 来 |
 |---|---|---|
+| `fleet-discuss` | 和用户把想法谈成设计文档：需求、技术、架构、前端方向、roadmap、模块设计；附各类文档的格式和前端定方向的做法 | 新写。说话规矩按用户要求定；流程和文档格式取自用户全局配置的「项目流程」「前端设计归档」「项目进度管理」「模块设计归档」几节 |
 | `fleet-dispatch` | 派活的基础规矩：三方分工、什么活外包、苦工从哪来、fleet 命令、角色、任务书六项、流水线、返工、验收、出错处理、进度流水、汇报 | pi-fleet、oc-fleet 的公共部分和「经 fleet 派活」一节；fleet-build 里的流水线与进度流水；Codex 的 auto-delegate 里讲宿主子代理的部分 |
 | `fleet-project-build` | 设计定稿后按里程碑无人值守开发到底 | fleet-build |
 | `fleet-ui-build` | 前端从分层规格到页面，含模板和截图验收工具 | ui-build |
@@ -23,12 +24,17 @@
 | `fleet-ops` | 维护调度站：服务、池子、角色、运行时、排障；pi 和 opencode 各一份参考 | pi-fleet、oc-fleet 里只跟 pi、opencode 有关的部分 |
 
 ```text
+fleet-discuss（谈设计，产出 docs/ 下的设计文档）
+        │ 文档齐了
+        ▼
 fleet-dispatch（基础：怎么派、怎么验、怎么记）
  ├─ fleet-project-build（按里程碑开发）
  ├─ fleet-ui-build（做界面）
  └─ fleet-review（评审与销账）
 fleet-ops（通道和运行时，维护时用）
 ```
+
+怎么看：先用 fleet-discuss 把设计谈定；开发、做界面、评审三套流程都站在 fleet-dispatch 的派活规矩上；fleet-ops 只在维护调度站时用。
 
 数据流：`skills/<名字>/` 是唯一源文件 → `node scripts/install-skills.mjs` 复制到宿主的 skill 目录（Claude Code 是 `~/.claude/skills/`，Codex 是 `~/.codex/skills/`），每份里放一个标记文件 `.fleet-studio-skill.json` → 宿主新开会话时按 description 挑 skill 加载进主会话的上下文 → 主会话照着用 `fleet` 命令派活。
 
@@ -56,18 +62,20 @@ fleet-ops（通道和运行时，维护时用）
 - **pi 和 opencode 合成一份 fleet-ops。** 主会话派活时不挑运行时（池配置决定）；分成两份会在「派活」时抢着被加载；以后加运行时只加一份参考文件。
 - **苦工从哪来**按 [sonnet 与 dsf 派活对比](../调研/sonnet与dsf派活对比.md) 定：边界清楚的小活走默认池；评审、集成测试、带并发或进程的子系统、要读懂大量现有代码的活给强模型；fleet 用不了时用宿主子代理兜底。宿主子代理必须写明模型（Claude Code 用 sonnet，Codex 用 gpt-5.6-luna），用了要记进进度流水，因为看板看不到它。
 - **谁派活谁记进度流水。** 原来只有开发流程那份要求写 `docs/进度/`，直接派活或做界面都不留记录。
+- **流程规矩写进 skill，不靠用户的全局配置。** 开发流程要用的设计文档（需求、技术、架构、前端、roadmap、模块）怎么谈、写成什么样，原来只写在用户自己的全局配置里；换个人用，或者这些文档事先没定好，fleet-project-build 就接不上。现在设计阶段的流程和文档格式在 fleet-discuss，开发阶段的代码与文档规矩在 fleet-project-build，界面实现和文案规矩在 fleet-ui-build，评审约定在 fleet-review。全局配置里对应的几节先保留，要不要瘦身等用户决定。
+- **讨论的说话规矩**按用户要求定：每轮只谈一小块，不长篇大论；英文词和专业名词括号解释；不拿代码举例；需求阶段拉长了谈，每轮先复述理解、再提带建议的问题；技术和架构由主会话主导，多用表格和图，图配「怎么看」；用户看不懂就直接问。
 - **触发词分开。** 旧的开发流程和界面流程分别用「按设计开干」「照设计开干」，只差一个字；现在界面流程改成「照前端设计把页面做出来」，派活基础规矩独占「派活」「外包」。
 - **苦工提示词只在仓库维护一份。** 原先 pi 读 `~/.pi/agent/roles/` 下的 8 份，测试角色在仓库，opencode 的三个 agent 又各带一份正文，已经对不上（opencode 的实现 agent 少了「不要再往下派活」）。
 - **opencode 继续用 agent，正文改由仓库生成。** 只读角色靠 agent 的权限设置禁止改文件；改成「提示词拼在任务前面」会丢掉这层限制。
 - **五份提示词补了同样三条边界**：不许再往下派活（苦工的命令行也能调用 fleet）；不许做会改仓库历史的 git 操作，只读命令可以；没人会回答它的提问，拿不准的写进回报。回报格式一字不动，回报解析和看板不受影响。
 - **信息设计的四个角色从默认配置里去掉。** info-design 早就不派苦工，没有 skill 在用；它们的提示词文件留在 `~/.pi/agent/roles/`，没删。
-- **安装用复制，不用链接。** Windows 上建链接要额外权限；复制加标记，覆盖和卸载都只动标记过的文件或目录。skill 碰到用户自己的同名目录就拒绝；opencode agent 碰到没标记的同名文件先挪进备份再写（这三个名字是给 fleet 用的）。
-- **被替换的东西都挪进备份，不删。** skill 在 `<数据目录>/skill-backup/<时间>/<宿主>/`，opencode agent 在 `<数据目录>/role-backup/<时间>/opencode/`，两个脚本的 `--uninstall` 都挪回最近一次。
+- **安装用复制，不用链接。** Windows 上建链接要额外权限；复制加标记，覆盖和卸载都只动标记过的文件或目录。skill 碰到用户自己的同名目录就拒绝；opencode agent 碰到没标记的同名文件先挪进备份再写（这三个名字是给 fleet 用的）；pi 的角色文件和仓库内容一致就算脚本写的，不一致先挪进备份。
+- **被替换的东西都挪进备份，不删。** skill 在 `<数据目录>/skill-backup/<时间>/<宿主>/`，opencode agent 和 pi 角色文件在 `<数据目录>/role-backup/<时间>/<opencode|pi>/`，两个脚本的 `--uninstall` 都挪回最近一次。
 - **skill 与命令的一致性交给门禁。** skill 里写到的子命令、选项、动作词必须在命令的 `--help` 里存在；正文点名的 fleet 系列 skill 必须在仓库里。命令改了参数、skill 没跟上，门禁变红。
 
 ## 4. 当前实现
 
-- 五份 skill 的正文；fleet-ui-build 带上原 ui-build 的参考、模板和六个验收工具。相对旧版的改动：派活处都指向 fleet 命令；修复任务书的回报格式对齐修复角色；截图工具关浏览器时按进程树整棵结束（搬了本仓库截图脚本 2026-09-24 的修法，旧版只结束主进程，会留下孤儿进程占着档案目录）；工具代码按本仓库的格式规则整理过。
+- 六份 skill 的正文。fleet-discuss 附两份参考：各类设计文档的格式、前端定方向的做法。fleet-project-build 补上代码与文档规矩（严格模式、按职责拆目录、核心逻辑必须单测、模块文档同步、roadmap 完成的依据）；fleet-ui-build 补上界面实现与文案的硬规矩。fleet-ui-build 带上原 ui-build 的参考、模板和六个验收工具。相对旧版的改动：派活处都指向 fleet 命令；修复任务书的回报格式对齐修复角色；截图工具关浏览器时按进程树整棵结束（搬了本仓库截图脚本 2026-09-24 的修法，旧版只结束主进程，会留下孤儿进程占着档案目录）；工具代码按本仓库的格式规则整理过。
 - 五份角色提示词在 `roles/`；默认配置的五个角色都写成 `builtin:roles/<角色>.md`。本机已有的 `~/.fleet-studio/config.json` 同样改好，改之前的原样备份在 `config.json.bak-20260924-roles`。
 - `scripts/install-skills.mjs`：默认装 Claude Code，`--target codex|all` 装 Codex 或两边；`--check` 只报告差异，有差异退出码 1；`--uninstall` 删掉本脚本装的、挪回最近一次备份的旧 skill。退役名单：pi-fleet、oc-fleet、fleet-build、ui-build、auto-delegate。宿主目录认 `CLAUDE_CONFIG_DIR`、`CODEX_HOME`，备份目录认 `FLEET_HOME`。
 - `scripts/install-roles.mjs`：一条命令同步两处：生成 opencode 的三个 agent，把五份提示词原样复制到 pi 的角色目录；`--check`、`--uninstall` 同上，只处理仓库里有的角色，目录里别的文件不动。agent 目录认 `XDG_CONFIG_HOME`。开头声明里的字符串一律写成 JSON 字符串，它同时是合法的 YAML 写法。
@@ -94,3 +102,4 @@ fleet-ops（通道和运行时，维护时用）
 | 2026-09-24 | 建立：五份 skill、安装脚本、skill 与命令一致性测试；装到 Claude Code，旧的 pi-fleet、oc-fleet、fleet-build、ui-build 挪进备份 |
 | 2026-09-24 | 苦工提示词收进仓库：五个角色只读仓库 `roles/`，补上三条共同边界；opencode 三个 agent 改由 `install-roles.mjs` 生成；信息设计四个角色从默认配置去掉；本机配置同步改好。模块文档由「fleet 系列 skill」改名为「skill 与苦工提示词」 |
 | 2026-09-24 | `install-roles.mjs` 同时同步 pi 的角色目录：`~/.pi/agent/roles/` 下四份旧提示词换成仓库版本并补上测试角色，旧文件挪进备份，信息设计四份不动 |
+| 2026-09-24 | 新增 fleet-discuss（谈设计）；把用户全局配置里的项目流程、文档格式、前端设计、界面实现与文案、代码与测试规矩搬进对应 skill；fleet-dispatch 的汇报要求术语括号解释 |
