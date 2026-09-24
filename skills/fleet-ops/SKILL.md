@@ -18,6 +18,7 @@ fleet-studio 是本机常驻的苦工调度站，仓库在 `C:\code\fleet-studio
 | `~/.fleet-studio/runs/<苦工编号>.<第几次运行>/` | 原始输出 `out.jsonl`、报错输出 `err.log`、解析好的时间线 `timeline.jsonl` |
 | `C:\code\fleet-studio\roles\` | 全部角色的提示词，只在这里维护（配置里写成 `builtin:roles/<角色>.md`）；`opencode-agents.json` 是生成 opencode agent 用的开头声明 |
 | `~/.config/opencode/agents/` | opencode 的实现、侦察、评审三个 agent，由 `node scripts/install-roles.mjs` 从仓库生成 |
+| `~/.pi/agent/roles/` | 不经过 fleet、直接启动 pi 时读的角色文件，由同一个脚本从仓库原样同步；目录里别的文件不动 |
 | `C:\code\fleet-studio\skills\` | fleet 系列 skill 的源文件，由 `node scripts/install-skills.mjs` 装进宿主 |
 
 环境变量 `FLEET_HOME` 可以把数据目录换到别处。
@@ -134,4 +135,4 @@ fleet pool set dsf --per-project 8   # 单个项目最多占 8 个；写 none �
 
 ## 七、改 fleet-studio 本身
 
-改之前读仓库的 `docs/roadmap.md` 和对应的模块设计文档；门禁是 `pnpm check`。改完 `pnpm build`，再 `fleet daemon restart` 生效。改了 `skills/` 下的 skill，运行 `node scripts/install-skills.mjs` 重新安装；改了 `roles/` 下实现、侦察、评审的提示词，运行 `node scripts/install-roles.mjs` 同步给 opencode（pi 直接读仓库，不用装）。
+改之前读仓库的 `docs/roadmap.md` 和对应的模块设计文档；门禁是 `pnpm check`。改完 `pnpm build`，再 `fleet daemon restart` 生效。改了 `skills/` 下的 skill，运行 `node scripts/install-skills.mjs` 重新安装；改了 `roles/` 下的提示词，运行 `node scripts/install-roles.mjs` 同步给 opencode 和 pi 的角色目录（经 fleet 派的 pi 苦工直接读仓库，不同步也立即生效）。

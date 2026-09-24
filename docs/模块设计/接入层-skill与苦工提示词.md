@@ -48,6 +48,7 @@ fleet-ops（通道和运行时，维护时用）
 
 - **pi：** 配置里写 `builtin:roles/<角色>.md` → 服务展开成仓库里的绝对路径 → 作为追加系统提示词交给 pi，每次拉起时现读。改了提示词，下一次派活就生效，不用重启服务，也不用安装。
 - **opencode：** 实现、侦察、评审走 `--agent <角色>`；agent 文件由 `node scripts/install-roles.mjs` 生成到 `~/.config/opencode/agents/`（开头声明取 `opencode-agents.json`，正文取 `roles/<角色>.md`）。修复、测试没有 agent，服务把仓库里的提示词拼在任务正文前面。
+- **直接启动 pi：** 不经过 fleet 时（例如 Codex 里旧的 pi-fleet），pi 读 `~/.pi/agent/roles/<角色>.md`。同一个脚本把仓库提示词原样复制过去；内容和仓库完全一样，所以靠「内容一致」认出是脚本写的，不往提示词里加标记。
 
 ## 3. 关键决策
 
@@ -69,7 +70,7 @@ fleet-ops（通道和运行时，维护时用）
 - 五份 skill 的正文；fleet-ui-build 带上原 ui-build 的参考、模板和六个验收工具。相对旧版的改动：派活处都指向 fleet 命令；修复任务书的回报格式对齐修复角色；截图工具关浏览器时按进程树整棵结束（搬了本仓库截图脚本 2026-09-24 的修法，旧版只结束主进程，会留下孤儿进程占着档案目录）；工具代码按本仓库的格式规则整理过。
 - 五份角色提示词在 `roles/`；默认配置的五个角色都写成 `builtin:roles/<角色>.md`。本机已有的 `~/.fleet-studio/config.json` 同样改好，改之前的原样备份在 `config.json.bak-20260924-roles`。
 - `scripts/install-skills.mjs`：默认装 Claude Code，`--target codex|all` 装 Codex 或两边；`--check` 只报告差异，有差异退出码 1；`--uninstall` 删掉本脚本装的、挪回最近一次备份的旧 skill。退役名单：pi-fleet、oc-fleet、fleet-build、ui-build、auto-delegate。宿主目录认 `CLAUDE_CONFIG_DIR`、`CODEX_HOME`，备份目录认 `FLEET_HOME`。
-- `scripts/install-roles.mjs`：生成 opencode 的三个 agent；`--check`、`--uninstall` 同上。agent 目录认 `XDG_CONFIG_HOME`。字符串一律写成 JSON 字符串，它同时是合法的 YAML 写法。
+- `scripts/install-roles.mjs`：一条命令同步两处：生成 opencode 的三个 agent，把五份提示词原样复制到 pi 的角色目录；`--check`、`--uninstall` 同上，只处理仓库里有的角色，目录里别的文件不动。agent 目录认 `XDG_CONFIG_HOME`。开头声明里的字符串一律写成 JSON 字符串，它同时是合法的 YAML 写法。
 - `packages/cli/test/skills.test.ts`：6 个测试，从 skill 的代码块和行内代码里取出全部 `fleet <子命令> ...` 用例，逐个对照 `fleet --help`、`fleet <子命令> --help` 的输出。`packages/core/test/config/defaults.test.ts` 核对五个角色都指向仓库提示词、文件都在。
 - 为了让一致性检查能统一跑 `--help`，顺带修了 `fleet daemon --help` 报「未知的 daemon 子命令」（见 [fleet 命令](命令行层-fleet命令.md) 改动历史）。
 
@@ -77,13 +78,12 @@ fleet-ops（通道和运行时，维护时用）
 
 - 门禁 `pnpm check` 里的 skill 一致性测试和默认角色测试；故意在 skill 里写一个不存在的选项（`fleet ps --watch`），测试会报出文件和那一句。
 - 两个安装脚本都在临时目录演练过：装之前检查、安装并挪走旧的、装后检查一致、改动后检查报出差异、覆盖重装、卸载并挪回；skill 另验了遇到用户自己的同名目录拒绝安装、非法目标报错。
-- 真实环境：skill 装到 Claude Code 后检查全部一致；opencode agent 生成后 `opencode agent list` 列出实现、侦察、评审三个 agent，侦察的「改文件」权限仍是拒绝；本机服务改完配置后 `fleet roles` 只剩五个角色；经 fleet 派一个真实侦察苦工读仓库文件，9 秒完成，按侦察角色的格式交回回报。
+- 真实环境：skill 装到 Claude Code 后检查全部一致；opencode agent 生成后 `opencode agent list` 列出实现、侦察、评审三个 agent，侦察的「改文件」权限仍是拒绝；pi 角色目录同步后检查五份和仓库一致；本机服务改完配置后 `fleet roles` 只剩五个角色；经 fleet 派一个真实侦察苦工读仓库文件，9 秒完成，按侦察角色的格式交回回报。
 - 待做：用户在新会话里实际用一轮；装到 Codex 后实测一次。
 
 ## 6. 待扩展项
 
 - 装到 Codex 并实测（Codex 那边还留着旧的 pi-fleet、oc-fleet、fleet-build 和 auto-delegate）。
-- `~/.pi/agent/roles/` 下的旧提示词副本：Codex 的旧 pi-fleet 直接启动 pi 时还在读，Codex 迁移完再清掉。
 - 把 Claude Code 的无头模式接成第三种运行时、开一个强模型池，这样强模型苦工也经过闸门、显示在看板上。属于需求变更。
 - 进度流水将来要给「现状卡」一类汇总用时，可能要把六项固定成可解析的格式。
 
@@ -93,3 +93,4 @@ fleet-ops（通道和运行时，维护时用）
 |---|---|
 | 2026-09-24 | 建立：五份 skill、安装脚本、skill 与命令一致性测试；装到 Claude Code，旧的 pi-fleet、oc-fleet、fleet-build、ui-build 挪进备份 |
 | 2026-09-24 | 苦工提示词收进仓库：五个角色只读仓库 `roles/`，补上三条共同边界；opencode 三个 agent 改由 `install-roles.mjs` 生成；信息设计四个角色从默认配置去掉；本机配置同步改好。模块文档由「fleet 系列 skill」改名为「skill 与苦工提示词」 |
+| 2026-09-24 | `install-roles.mjs` 同时同步 pi 的角色目录：`~/.pi/agent/roles/` 下四份旧提示词换成仓库版本并补上测试角色，旧文件挪进备份，信息设计四份不动 |
