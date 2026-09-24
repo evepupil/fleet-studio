@@ -14,6 +14,8 @@ fleet-studio 是本机常驻的苦工调度站，仓库在 `C:\code\fleet-studio
 | `~/.fleet-studio/config.json` | 池子、角色、默认值、端口，改完自动生效 |
 | `~/.fleet-studio/daemon.json` | 服务的进程号、端口和本机令牌，命令行靠它找到服务 |
 | `~/.fleet-studio/daemon.log` | 服务日志 |
+| `~/.fleet-studio/worker.env` | 苦工专用的环境变量：网页请求走本机代理、哪些域名不走代理（见第五节） |
+| `~/.pi/agent/web-search.json` | pi 联网插件的配置：搜索被限流时换哪家、难抓的页面交给谁代读 |
 | `~/.fleet-studio/fleet.db` | 项目、苦工、运行三类记录 |
 | `~/.fleet-studio/runs/<苦工编号>.<第几次运行>/` | 原始输出 `out.jsonl`、报错输出 `err.log`、解析好的时间线 `timeline.jsonl` |
 | `C:\code\fleet-studio\roles\` | 全部角色的提示词，只在这里维护（配置里写成 `builtin:roles/<角色>.md`）；`opencode-agents.json` 是生成 opencode agent 用的开头声明 |
@@ -110,6 +112,7 @@ fleet pool set dsf --per-project 8   # 单个项目最多占 8 个；写 none �
 | 什么时候用 | 一律用它 | 已停用：池子里都没配 opencode 的模型，点名也派不出去。用户明确要用时，才给对应的池加回（写法见 `references/opencode.md` 开头） |
 
 - 可执行文件自动探测；要指定就改 `config.json` 的 `runtimes.pi.command` 或 `runtimes.opencode.command`（写成数组：可执行文件加前置参数）。
+- **苦工上网走本机代理。** 本机的 `runtimes.pi.command` 写死成「node + `--use-env-proxy` + `--env-file-if-exists=worker.env` + pi 入口」，让苦工的网页请求走 Clash（7897 端口），模型请求照旧直连。不这么做，Docker Hub、HuggingFace、Google 都连不上，调研类的活会被拖到四十多分钟（细节见 `references/pi.md` 联网工具一节）。两条要记住：**新接模型通道时，把它的域名加进 `worker.env` 的 `NO_PROXY`**；升级 pi 后确认命令里的入口文件还在（不在就是「启动失败」）。删掉 `worker.env` 苦工就回到直连，删掉 `command` 就回到自动探测。
 - pi 碰到通道持续报错会无限重试、自己不退出。服务在连续 8 次请求失败（约 40 秒）时判「模型或通道出错」并结束进程。
 - 单次运行超时（默认 30 分钟）一到，服务结束整棵进程树。
 

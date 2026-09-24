@@ -19,6 +19,7 @@ fleet 拉起 pi 时会自动补上用户级环境变量，所以终端里读不�
 - **地址必须带 `/v1`**：写成 `https://xxx.com` 而不是 `https://xxx.com/v1`，整条通道会静默变成「找不到」。改完地址一定实际跑一条验证。
 - 上下文长度是扩展里估的，报超长就把任务拆细，或者调那个数字。
 - 密钥存成用户级环境变量，扩展里写 `$变量名`。fleet 每次拉起苦工前重新读一遍，新设的变量不用重启服务。
+- 新通道的域名要加进 `~/.fleet-studio/worker.env` 的 `NO_PROXY`，让苦工的模型请求直连（见联网工具一节）。
 
 | 通道 | 地址 | 扩展文件 | 密钥变量 | 登记的模型 |
 |---|---|---|---|---|
@@ -47,6 +48,11 @@ pi install npm:pi-web-access
 
 - 不用密钥，默认走 Exa MCP，也支持 DuckDuckGo；顺带能提取 PDF 文字、克隆 GitHub 仓库、取 YouTube 字幕。
 - 代价：这四个工具的定义会进每个会话的上下文。所以 fleet 的角色配置按需裁掉：只有侦察和收集能搜索，评审连抓网页都禁掉。
+- **苦工走本机代理上网（2026-09-25 起）。** 这台机器的 Clash（verge-mihomo，7897 端口）只设成了系统代理，命令行和 Node 程序默认不走，苦工直连时 Docker Hub、HuggingFace、Google、Jina 都连不上，要干等十来秒超时。2026-09-24 两路调研收集苦工各跑了四十多分钟：一路抓网页 72 次失败 36 次、同一页抓了 8 遍；另一路 11 次失败 8 次，只好拿命令行伪装浏览器硬抓。现在本机 `config.json` 的 `runtimes.pi.command` 是「node + `--use-env-proxy` + `--env-file-if-exists=~/.fleet-studio/worker.env` + pi 入口」，代理和不走代理的名单都在 `worker.env` 里，只影响 fleet 拉起的苦工；模型通道和 GitHub 接口在 `NO_PROXY` 里直连（GitHub 接口走代理的共用出口会被限流）。改完实测：之前失败的 Docker Hub、HuggingFace、AMD 文档、靠脚本渲染的 rtings、反爬的 geizhals 全部抓到，整条活 37 秒。
+- **新接模型通道时，把它的域名加进 `worker.env` 的 `NO_PROXY`**，否则苦工的模型请求会绕到本机代理上，代理一停整个池就失败。
+- **别用插件自带的 `proxy` 开关。** 它开了以后改用 curl 发请求，而本机的 curl（Windows 自带的加密组件）在 Docker Hub、AMD 文档、vLLM 文档这些站上会卡在证书吊销检查，直连能打开的站反而打不开。Node 自己的请求不做吊销检查，所以走环境变量这条路。
+- **服务不把拉起者的代理传给苦工。** Node 读环境文件时盖不过已经存在的同名变量，而服务是谁拉起的就继承谁的环境（codeg 里的会话带着它自己的本地代理）。所以服务给苦工补环境前会先去掉继承来的 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY`、`NO_PROXY`，注册表里用户自己设的全局代理照常保留。
+- **插件配置 `~/.pi/agent/web-search.json`**：搜索先用 Exa，被限流（几路同时搜时常见）或网络出错就换 DuckDuckGo；允许把读不出内容的页面交给 Jina 代读（能处理靠脚本渲染的页面和一部分反爬站，实测 5 个难抓的站多读到 3 个，versus、pcpartpicker 这种连 Jina 也挡）；走代理时不在本地预先解析域名。
 - **插件靠 `~/.pi/agent/settings.json` 里的 `packages` 一项启用。** 改这个文件（例如调推理档位）只改对应字段，别整份重写：2026-09-22 就因为整份重写丢了这一项，此后所有苦工都没有联网工具，侦察只能拿命令行硬抓网页，一直没人发现。`pi list` 列不出 `npm:pi-web-access` 就是丢了，重新 `pi install` 即可。
 
 ## 通道容量实测
