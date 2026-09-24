@@ -24,14 +24,18 @@ fleet 拉起 pi 时会自动补上用户级环境变量，所以终端里读不�
 |---|---|---|---|---|
 | mcgrox | `https://www.mcgrox.top/v1` | `mcgrox-provider.ts` | `MCGROX_API_KEY` | deepseek-v4.1-flash |
 | chaosyn（mini-cpa 网关） | `https://mini-cpa.chaosyn.com/v1` | `chaosyn-provider.ts` | `CHAOSYN_API_KEY` | GLM-5.3-Flash、Grok 4.6 |
+| snow（朋友自建：vLLM 外面套 new-api 网关） | `https://snow.fcsaidt.de/v1` | `snow-provider.ts` | `SNOW_API_KEY` | qwen3.8-27b |
 
 chaosyn 网关上的 Grok 4.7 和 Grok 4.7 Fast 没登记（2026-09-24 实测）：两个都会丢掉调用方的系统提示词，模型只认网关塞进去的「Claude Code」身份；Grok 4.7 还把工具调用当成正文 JSON 吐出来，十几次里只成功 1 次。Grok 4.6 两项都正常。
+
+snow 是朋友自己机器上的服务，别人也在用，别拿它长时间满载跑大批活。2026-09-24 接入时实测：系统提示词能送到（系统和开发者两种身份都行），工具调用和多轮回传正常；服务端上下文上限 256K，扩展里按 128K 登记；推理档位只认一部分，要翻译（见下一节）。另外两个小现象：不给工具时模型会把工具调用写成正文（苦工总带着工具，不受影响）；本机用 curl 打它要加 `--ssl-no-revoke`，否则证书吊销检查连不上会直接报错（pi 不受影响）。
 
 ## 推理档位
 
 - 七档：`off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`。
 - 全局默认在 `~/.pi/agent/settings.json` 的 `defaultThinkingLevel`，已从 `medium` 改成 `max`：当前苦工模型在低档位下判断力明显不够。
 - fleet 派活时 `--thinking <档位>` 覆盖这一次；配置里 `defaults.thinking` 可以统一覆盖。
+- **有的服务只认一部分档位，发了不认的直接 400。** 例如 snow 只认 `low` / `medium` / `xhigh` / `none`。模型没写档位对照表时，pi 只放出 `off` 到 `high` 五档，`max` 会被压成 `high` 发出去，撞上这种服务苦工第一个请求就失败。接新模型时拿各档位实打一次（`reasoning_effort` 参数），不认的在扩展的模型里写 `thinkingLevelMap` 逐档翻译：值写服务认的档位名，写 `null` 表示不支持这一档，`off` 对应关思考时发的值。写法照抄 `snow-provider.ts`。
 
 ## 联网工具
 
@@ -67,6 +71,18 @@ pi install npm:pi-web-access
 | 8 路各自连续发，压 97 秒 | 193 个请求全过，约 2 请求/秒 |
 
 并发上限按 9 算，打八折取 7。单个请求偏慢，一句话要 5～25 秒；经 fleet 派的一条只读侦察连调 25 次工具，2 分 43 秒干完，没有重试。
+
+### snow 的 qwen3.8-27b（池 qwen27，容量 5，2026-09-24）
+
+| 压法 | 结果 |
+|---|---|
+| 同一时刻打出 4 / 6 个带工具的流式请求（6 个压了 4 次） | 全过 |
+| 同一时刻 8 个，压了 5 次 | 4 次全过，1 次掉 1 个 |
+| 同一时刻 12 个，压了 3 次 | 2 次全过，1 次掉 2 个 |
+| 同一时刻 16 个 | 掉 1 个，其余首字要等 8.5 秒 |
+| 5 路各自连续发，压 122 秒 | 159 个请求全过，约 1.3 请求/秒，单个中位 3.5 秒 |
+
+掉的都是网关立刻返回的 500「upstream error: do request failed」，也就是网关连不上朋友的后端，pi 会自己重试。并发上限按 6 算，打八折取 5。首字时间随朋友那边的负载在 1～9 秒之间波动。读上下文约每秒 4000 token（4.8 万 token 第一次要 12 秒），开头相同的再发只要 3 秒，有前缀缓存，苦工多轮对话不会越来越慢。经 fleet 派的只读侦察和写代码各一条，都在 1 分 12 秒左右干完，回报格式对，没有重试。
 
 ## 已知的坑
 
