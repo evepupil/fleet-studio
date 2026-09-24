@@ -91,10 +91,11 @@ B. ……
 
 ## 调研：经 fleet 派苦工
 
-需要事实时（同类产品有哪些功能、某个工具支不支持、现有代码怎么写的），派侦察苦工去查，规矩照 `fleet-dispatch`：
+需要事实时（同类产品有哪些功能、某个工具支不支持、现有代码怎么写的），派侦察苦工去查，规矩照 `fleet-dispatch`。**拆细了多路一起跑**：一个产品或一个站一路，汇总你来做，拆法见 fleet-dispatch 第五节「探索的活怎么拆」：
 
 ```bash
-fleet run --role scout --title "调研：同类产品的功能清单" --prompt-file .fleet/briefs/research-features.md
+fleet run --role scout --title "调研：gsmarena 有哪些功能" --prompt-file .fleet/briefs/research-gsmarena.md
+fleet run --role scout --title "调研：rtings 有哪些功能" --prompt-file .fleet/briefs/research-rtings.md
 ```
 
 - 需要判断力的调研（看真实界面好在哪、比较几个方案）给强模型，见 fleet-dispatch 第二节。
