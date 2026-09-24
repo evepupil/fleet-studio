@@ -150,8 +150,11 @@ export async function runDaemonCommand(
   argv: readonly string[],
   deps: CommandDeps,
 ): Promise<number> {
-  const [sub, ...rest] = argv;
-  const { values } = parseCommandArgs({ args: rest, options: { ...COMMON_OPTIONS } });
+  // `fleet daemon --help` 这种把选项写在最前面的，第一个参数就不是子命令，整串交给选项解析
+  const [first, ...others] = argv;
+  const sub = first === undefined || first.startsWith("-") ? undefined : first;
+  const rest = sub === undefined ? argv : others;
+  const { values } = parseCommandArgs({ args: [...rest], options: { ...COMMON_OPTIONS } });
 
   if (values.help) {
     deps.io.stdout(DAEMON_HELP);

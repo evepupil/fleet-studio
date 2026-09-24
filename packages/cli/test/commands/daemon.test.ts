@@ -154,3 +154,19 @@ describe("runDaemonCommand 用法错误", () => {
     await expect(runDaemonCommand(["reload"], deps)).rejects.toThrow(CliUsageError);
   });
 });
+
+describe("runDaemonCommand 帮助", () => {
+  it("fleet daemon --help 打印用法，退出码 0，不去找服务", async () => {
+    const deps = createFakeDeps();
+    const exitCode = await runDaemonCommand(["--help"], deps);
+    expect(exitCode).toBe(EXIT_CODE.ok);
+    expect(deps.stdoutLines.join("\n")).toContain("fleet daemon <start|stop|status|restart>");
+  });
+
+  it("帮助写在子命令后面（fleet daemon status --help）同样打印用法", async () => {
+    const deps = createFakeDeps();
+    const exitCode = await runDaemonCommand(["status", "--help"], deps);
+    expect(exitCode).toBe(EXIT_CODE.ok);
+    expect(deps.stdoutLines.join("\n")).toContain("fleet daemon <start|stop|status|restart>");
+  });
+});
