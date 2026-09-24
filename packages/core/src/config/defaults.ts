@@ -56,7 +56,7 @@ export const DEFAULT_CONFIG: FleetConfigInput = {
       label: "实现",
       description: "照着任务书写代码",
       pi: {
-        appendSystemPrompt: "~/.pi/agent/roles/worker.md",
+        appendSystemPrompt: `${BUILTIN_PREFIX}roles/worker.md`,
         excludeTools: NO_NETWORK_TOOLS,
       },
       opencode: { agent: "worker" },
@@ -66,7 +66,7 @@ export const DEFAULT_CONFIG: FleetConfigInput = {
       label: "侦察",
       description: "只读查清现状，结论带出处",
       pi: {
-        appendSystemPrompt: "~/.pi/agent/roles/scout.md",
+        appendSystemPrompt: `${BUILTIN_PREFIX}roles/scout.md`,
         excludeTools: ["write", "edit"],
       },
       opencode: { agent: "scout" },
@@ -76,7 +76,7 @@ export const DEFAULT_CONFIG: FleetConfigInput = {
       label: "评审",
       description: "只看改动挑缺陷，不改文件",
       pi: {
-        appendSystemPrompt: "~/.pi/agent/roles/reviewer.md",
+        appendSystemPrompt: `${BUILTIN_PREFIX}roles/reviewer.md`,
         excludeTools: READONLY_NO_NETWORK_TOOLS,
       },
       opencode: { agent: "reviewer" },
@@ -86,7 +86,7 @@ export const DEFAULT_CONFIG: FleetConfigInput = {
       label: "修复",
       description: "只改评审点名的缺陷",
       pi: {
-        appendSystemPrompt: "~/.pi/agent/roles/fixer.md",
+        appendSystemPrompt: `${BUILTIN_PREFIX}roles/fixer.md`,
         excludeTools: NO_NETWORK_TOOLS,
       },
       opencode: {},
@@ -97,46 +97,6 @@ export const DEFAULT_CONFIG: FleetConfigInput = {
       description: "按任务书描述的行为写测试、跑测试，不改业务代码",
       pi: {
         appendSystemPrompt: `${BUILTIN_PREFIX}roles/tester.md`,
-        excludeTools: NO_NETWORK_TOOLS,
-      },
-      opencode: {},
-    },
-    {
-      id: "ia-scout",
-      label: "信息调研",
-      description: "调查同类网站的信息结构",
-      pi: {
-        appendSystemPrompt: "~/.pi/agent/roles/ia-scout.md",
-        excludeTools: ["write", "edit"],
-      },
-      opencode: {},
-    },
-    {
-      id: "ia-expand",
-      label: "信息展开",
-      description: "把候选项向下展开一层并判断去留",
-      pi: {
-        appendSystemPrompt: "~/.pi/agent/roles/ia-expand.md",
-        excludeTools: READONLY_NO_NETWORK_TOOLS,
-      },
-      opencode: {},
-    },
-    {
-      id: "ia-critic",
-      label: "信息评审",
-      description: "挑信息设计文档的毛病",
-      pi: {
-        appendSystemPrompt: "~/.pi/agent/roles/ia-critic.md",
-        excludeTools: READONLY_NO_NETWORK_TOOLS,
-      },
-      opencode: {},
-    },
-    {
-      id: "ia-writer",
-      label: "信息撰写",
-      description: "写单个区块的信息设计文件",
-      pi: {
-        appendSystemPrompt: "~/.pi/agent/roles/ia-writer.md",
         excludeTools: NO_NETWORK_TOOLS,
       },
       opencode: {},

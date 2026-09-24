@@ -23,7 +23,7 @@ opencode models
 ```
 
 - 密钥写死在 `~/.config/opencode/opencode.json` 里，**不读环境变量**。模型列不出来，先看这个文件里的密钥和网关地址，再用 `curl` 打网关的模型列表接口。
-- 角色是 opencode 的 agent，定义在 `~/.config/opencode/agents/<角色>.md`。fleet 的实现、侦察、评审三个角色对应同名 agent；没有同名 agent 的角色，fleet 把提示词拼在任务正文前面。
+- 角色是 opencode 的 agent，定义在 `~/.config/opencode/agents/<角色>.md`。fleet 的实现、侦察、评审三个角色对应同名 agent，这三个文件由 `node scripts/install-roles.mjs` 用仓库 `roles/` 下的提示词生成，**不要直接改**，改仓库再重新生成。没有同名 agent 的角色，fleet 把仓库里的提示词拼在任务正文前面。
 - **agent 名写错会静默退回默认 agent**，不报错。新加 agent 后派一条小任务，看输出开头显示的 agent 和模型对不对。
 
 ## 模型怎么指定

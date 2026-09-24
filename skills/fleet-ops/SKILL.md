@@ -16,9 +16,9 @@ fleet-studio 是本机常驻的苦工调度站，仓库在 `C:\code\fleet-studio
 | `~/.fleet-studio/daemon.log` | 服务日志 |
 | `~/.fleet-studio/fleet.db` | 项目、苦工、运行三类记录 |
 | `~/.fleet-studio/runs/<苦工编号>.<第几次运行>/` | 原始输出 `out.jsonl`、报错输出 `err.log`、解析好的时间线 `timeline.jsonl` |
-| `~/.pi/agent/roles/` | 实现、侦察、评审、修复等角色的提示词 |
-| `C:\code\fleet-studio\roles\` | 测试角色的提示词（配置里写成 `builtin:roles/tester.md`） |
-| `C:\code\fleet-studio\skills\` | fleet 系列 skill 的源文件 |
+| `C:\code\fleet-studio\roles\` | 全部角色的提示词，只在这里维护（配置里写成 `builtin:roles/<角色>.md`）；`opencode-agents.json` 是生成 opencode agent 用的开头声明 |
+| `~/.config/opencode/agents/` | opencode 的实现、侦察、评审三个 agent，由 `node scripts/install-roles.mjs` 从仓库生成 |
+| `C:\code\fleet-studio\skills\` | fleet 系列 skill 的源文件，由 `node scripts/install-skills.mjs` 装进宿主 |
 
 环境变量 `FLEET_HOME` 可以把数据目录换到别处。
 
@@ -73,7 +73,7 @@ fleet pool set dsf --per-project 8   # 单个项目最多占 8 个；写 none �
 
 ## 四、角色
 
-`fleet roles` 列出全部角色。增删改角色只动 `config.json` 的 `roles`，不用改代码：
+`fleet roles` 列出全部角色。增删改角色只动 `config.json` 的 `roles`，不用改代码；提示词正文写成仓库 `roles/<角色>.md`：
 
 ```json
 {
@@ -81,17 +81,18 @@ fleet pool set dsf --per-project 8   # 单个项目最多占 8 个；写 none �
   "label": "文档",
   "description": "照任务书写或改文档",
   "pi": {
-    "appendSystemPrompt": "~/.pi/agent/roles/doc-writer.md",
+    "appendSystemPrompt": "builtin:roles/doc-writer.md",
     "excludeTools": ["web_search", "get_search_content", "source_check"]
   },
   "opencode": {}
 }
 ```
 
-- `appendSystemPrompt`：追加到苦工系统提示词后面的文件。`~` 开头指用户目录，`builtin:` 开头指 fleet-studio 仓库根目录。
+- `appendSystemPrompt`：追加到苦工系统提示词后面的文件。`builtin:` 开头指 fleet-studio 仓库根目录，`~` 开头指用户目录。提示词一律放仓库，改完对下一次派活立即生效，不用重启服务。
+- 每份提示词末尾都有同样的三条边界：不许再往下派活、不许提交代码、没人会回答它的提问。新写角色照抄这三条。
 - `excludeTools` 列出禁用的工具，`tools` 列出只允许的工具。服务直接把参数交给进程，不经过命令行转义，限制一定生效。
 - 只读角色至少禁掉 `write` 和 `edit`；不该联网的禁掉 `web_search`、`get_search_content`、`source_check`，连网页也不许抓就再加 `fetch_content`。
-- `opencode.agent` 填 opencode 里同名的 agent；不填时，服务把提示词文件的内容拼在任务正文前面。
+- `opencode.agent` 填 opencode 里同名的 agent；不填时，服务把提示词文件的内容拼在任务正文前面。要带权限（例如不许改文件）的角色才需要 agent：在 `roles/opencode-agents.json` 里加一项，再运行 `node scripts/install-roles.mjs` 生成。
 - 提示词里要规定固定格式的回报（例如 `SUMMARY / FILES / VERIFY / SELF_REPORT / BLOCKED`，评审用 `VERDICT / ISSUES`），看板和 `fleet wait` 按段落拆开显示，通过和不通过会醒目标出。
 - 验证角色的工具限制时，别问模型「你有哪些工具」，让它实际去用那个工具，看做不做得成。
 
@@ -133,4 +134,4 @@ fleet pool set dsf --per-project 8   # 单个项目最多占 8 个；写 none �
 
 ## 七、改 fleet-studio 本身
 
-改之前读仓库的 `docs/roadmap.md` 和对应的模块设计文档；门禁是 `pnpm check`。改完 `pnpm build`，再 `fleet daemon restart` 生效。改了 `skills/` 下的 skill，运行 `node scripts/install-skills.mjs` 重新安装。
+改之前读仓库的 `docs/roadmap.md` 和对应的模块设计文档；门禁是 `pnpm check`。改完 `pnpm build`，再 `fleet daemon restart` 生效。改了 `skills/` 下的 skill，运行 `node scripts/install-skills.mjs` 重新安装；改了 `roles/` 下实现、侦察、评审的提示词，运行 `node scripts/install-roles.mjs` 同步给 opencode（pi 直接读仓库，不用装）。

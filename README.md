@@ -15,6 +15,7 @@ pnpm install
 pnpm build
 node scripts/install-shims.mjs      # 把 fleet 命令装进 npm 全局目录（已在 PATH 中）
 node scripts/install-skills.mjs     # 把 fleet 系列 skill 装进 Claude Code（--target codex|all 装 Codex 或两边）
+node scripts/install-roles.mjs      # 用 roles/ 下的苦工提示词生成 opencode 的 agent（只用 pi 可以不装）
 ```
 
 卸载命令外壳：`node scripts/install-shims.mjs --uninstall`。skill 的检查与卸载见下一节。
@@ -33,6 +34,10 @@ node scripts/install-skills.mjs     # 把 fleet 系列 skill 装进 Claude Code�
 
 - 安装会把被取代的旧 skill（pi-fleet、oc-fleet、fleet-build、ui-build、auto-delegate）挪进 `~/.fleet-studio/skill-backup/`；`node scripts/install-skills.mjs --uninstall` 删掉新的、挪回旧的。
 - `node scripts/install-skills.mjs --check` 查装上的和仓库里是否一致。改了 `skills/` 要重新安装，新开的会话才用上新版本。
+
+## 苦工提示词
+
+实现、侦察、评审、修复、测试五个角色的提示词在 `roles/`，只在这里维护。fleet 派 pi 苦工时每次现读，改完下一次派活就生效；opencode 的实现、侦察、评审三个 agent 由 `node scripts/install-roles.mjs` 从这里生成，改完要重新生成（`--check` 查是否一致，`--uninstall` 挪回原来的文件）。
 
 ## 主会话怎么用
 

@@ -1,0 +1,21 @@
+{
+  "shared": {
+    "mode": "all",
+    "model": "mcgrox/deepseek-v4.1-flash",
+    "temperature": 0.1
+  },
+  "agents": {
+    "worker": {
+      "description": "执行明确定义的编码任务——改代码、写测试、跑命令。适合已经拆解清楚、有明确验收标准的活。",
+      "permission": {}
+    },
+    "scout": {
+      "description": "只读侦察——在代码库里找东西、摸清现状、回答「这块怎么实现的」，不改任何文件。",
+      "permission": { "edit": "deny", "bash": "ask" }
+    },
+    "reviewer": {
+      "description": "只读评审——检查改动的正确性和明显缺陷，不改任何文件。",
+      "permission": { "edit": "deny" }
+    }
+  }
+}

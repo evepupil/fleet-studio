@@ -1,5 +1,11 @@
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { BUILTIN_PREFIX, DEFAULT_CONFIG } from "../../src/config/defaults.js";
+
+/** 仓库根目录：builtin: 开头的提示词路径相对它展开。 */
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 
 describe("BUILTIN_PREFIX", () => {
   it("等于 builtin:", () => {
@@ -39,23 +45,27 @@ describe("DEFAULT_CONFIG", () => {
     });
   });
 
-  it("九个角色编号齐全，顺序和规格表一致", () => {
+  it("五个角色编号齐全，顺序和规格表一致", () => {
     expect(DEFAULT_CONFIG.roles.map((role) => role.id)).toEqual([
       "worker",
       "scout",
       "reviewer",
       "fixer",
       "tester",
-      "ia-scout",
-      "ia-expand",
-      "ia-critic",
-      "ia-writer",
     ]);
   });
 
-  it("tester 角色的提示词走 builtin: 前缀", () => {
-    const tester = DEFAULT_CONFIG.roles.find((role) => role.id === "tester");
-    expect(tester?.pi?.appendSystemPrompt).toBe(`${BUILTIN_PREFIX}roles/tester.md`);
+  it("每个角色的提示词都走 builtin:roles/<角色>.md，只在仓库里维护一份", () => {
+    for (const role of DEFAULT_CONFIG.roles) {
+      expect(role.pi?.appendSystemPrompt, role.id).toBe(`${BUILTIN_PREFIX}roles/${role.id}.md`);
+    }
+  });
+
+  it("每个角色的提示词文件都真的在仓库 roles/ 里", () => {
+    const missing = DEFAULT_CONFIG.roles
+      .map((role) => `roles/${role.id}.md`)
+      .filter((relativePath) => !existsSync(join(REPO_ROOT, relativePath)));
+    expect(missing).toEqual([]);
   });
 
   it("scout 角色只屏蔽写文件工具，opencode 走内置 agent", () => {

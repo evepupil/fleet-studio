@@ -721,7 +721,7 @@ export const busyWorkerSpecs: readonly WorkerSpec[] = [
     id: "wy3p4q",
     project: ONAHO,
     pool: "dsf",
-    role: "ia-scout",
+    role: "scout",
     title: "侦察：竞品站信息结构",
     cwd: "C:\\Users\\zhoutao\\AppData\\Local\\Temp\\info-design\\onaho-wiki\\L0",
     runs: [
@@ -731,7 +731,8 @@ export const busyWorkerSpecs: readonly WorkerSpec[] = [
         startedMin: 69.5,
         endedMin: 50.0,
         tokens: 131_000,
-        finalText: "SITES: 4 个同类站点\nPAGES: 见各站页面清单\nGAPS: 无",
+        finalText:
+          "FINDINGS: 4 个同类站点的信息结构，见各站页面清单\nEVIDENCE: 各站首页与导航链接\nGAPS: 无",
       },
     ],
   },

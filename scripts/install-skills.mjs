@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 把仓库 skills/ 下的 fleet 系列 skill 装进宿主的 skill 目录
- * （接入层模块设计 docs/模块设计/接入层-fleet系列skill.md）。只用 Node 内置模块，不依赖任何第三方包。
+ * （接入层模块设计 docs/模块设计/接入层-skill与苦工提示词.md）。只用 Node 内置模块，不依赖任何第三方包。
  *
  * 安装做两件事：
  * 1. 被 fleet 系列取代的旧全局 skill（RETIRED_SKILLS）挪进 <数据目录>/skill-backup/<时间>/<宿主>/，

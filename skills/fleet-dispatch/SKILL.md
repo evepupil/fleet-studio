@@ -36,7 +36,7 @@ description: 经 fleet-studio 派苦工干活的基础规矩：什么活该外�
 本家子代理的用法：
 
 - **一律写明模型**，不写会跟着主会话用最贵那档。Claude Code 用 Agent 工具并传 `model: "sonnet"`；Codex 用 `spawn_agent` 并传 `model: "gpt-5.6-luna"`、`reasoning_effort: "max"`。
-- 任务书照第四节写全。它不会自动加载角色，要把对应角色的提示词（`~/.pi/agent/roles/` 下，测试角色在 `C:\code\fleet-studio\roles\tester.md`）连同回报格式一起放进任务书。
+- 任务书照第四节写全。它不会自动加载角色，要把对应角色的提示词（`C:\code\fleet-studio\roles\<角色>.md`）连同回报格式一起放进任务书。
 - 它不经过 fleet，看板上看不到。用了就在进度流水里记一笔：几路、干什么、为什么没走 fleet。
 - 用户在消息里点名了某个 agent（codeg 里的 @），按用户说的委派给那个 agent。
 
