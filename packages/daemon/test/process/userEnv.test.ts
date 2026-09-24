@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  dropInheritedProxyVars,
   expandEnvReferences,
   mergeWorkerEnv,
   parseRegQueryOutput,
@@ -92,6 +93,39 @@ describe("mergeWorkerEnv", () => {
   it("Path / PATH 永远不从注册表补，即使当前环境没有", () => {
     const result = mergeWorkerEnv({ FOO: "1" }, { Path: "C:\\a", PATH: "C:\\b" });
     expect(result).toEqual({ FOO: "1" });
+  });
+});
+
+describe("dropInheritedProxyVars", () => {
+  it("去掉四个代理变量，名字不区分大小写", () => {
+    const result = dropInheritedProxyVars({
+      HTTP_PROXY: "http://127.0.0.1:1",
+      https_proxy: "http://127.0.0.1:2",
+      All_Proxy: "socks5://127.0.0.1:3",
+      NO_PROXY: "localhost",
+      FOO: "1",
+    });
+    expect(result).toEqual({ FOO: "1" });
+  });
+
+  it("名字里只是带着 PROXY 字样的其他变量原样保留", () => {
+    const env = { MY_PROXY_PORT: "7897", NO_PROXY_LIST: "x", PROXYCHAINS_CONF: "y" };
+    expect(dropInheritedProxyVars(env)).toEqual(env);
+  });
+
+  it("不改入参", () => {
+    const env = { HTTPS_PROXY: "http://127.0.0.1:2", FOO: "1" };
+    dropInheritedProxyVars(env);
+    expect(env).toEqual({ HTTPS_PROXY: "http://127.0.0.1:2", FOO: "1" });
+  });
+
+  it("和 mergeWorkerEnv 连用：继承来的代理丢掉，注册表里用户设的全局代理照常补进去", () => {
+    const inherited = { HTTPS_PROXY: "http://127.0.0.1:62700", FOO: "1" };
+    const registry = { HTTPS_PROXY: "http://127.0.0.1:7897" };
+    expect(mergeWorkerEnv(dropInheritedProxyVars(inherited), registry)).toEqual({
+      FOO: "1",
+      HTTPS_PROXY: "http://127.0.0.1:7897",
+    });
   });
 });
 

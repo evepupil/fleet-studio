@@ -27,6 +27,7 @@ export type {
 } from "./types.js";
 export type { RegistryEntry } from "./userEnv.js";
 export {
+  dropInheritedProxyVars,
   expandEnvReferences,
   mergeWorkerEnv,
   parseRegQueryOutput,

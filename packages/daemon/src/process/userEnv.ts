@@ -19,6 +19,14 @@ const HKCU_ENVIRONMENT_KEY = "HKCU\\Environment";
 /** Path/PATH 不从注册表补：当前进程的 PATH 已经包含它们，重复拼接只会越来越长。 */
 const NAMES_NEVER_MERGED_FROM_REGISTRY = new Set(["path"]);
 
+/**
+ * 代理相关的变量名（小写比较）。服务进程里的这几个变量来自「拉起服务的那个会话」，
+ * 比如 codeg 里的会话带着它自己的本地代理，跟苦工该怎么上网无关，还随拉起者变化。
+ * 苦工的代理只由 pi 启动命令读的环境文件决定（见 fleet-ops 的 pi 参考），而那份文件
+ * 盖不过已经存在的同名变量，所以补环境前先把继承来的丢掉。
+ */
+const INHERITED_PROXY_NAMES = new Set(["http_proxy", "https_proxy", "all_proxy", "no_proxy"]);
+
 /** reg query 输出的一行：变量名、注册表类型（REG_SZ / REG_EXPAND_SZ / ...）、原始值。 */
 export interface RegistryEntry {
   name: string;
@@ -85,6 +93,22 @@ export function snapshotProcessEnv(): Record<string, string> {
     }
   }
   return snapshot;
+}
+
+/**
+ * 去掉服务进程从拉起者那里继承来的代理变量（名字不区分大小写），返回新对象、不改入参。
+ * 只用在当前进程环境这一侧；注册表里用户自己设的全局代理是有意的全局设置，照常补进去。
+ */
+export function dropInheritedProxyVars(
+  env: Readonly<Record<string, string>>,
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [name, value] of Object.entries(env)) {
+    if (!INHERITED_PROXY_NAMES.has(name.toLowerCase())) {
+      result[name] = value;
+    }
+  }
+  return result;
 }
 
 /**

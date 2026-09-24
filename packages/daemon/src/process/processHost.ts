@@ -17,7 +17,12 @@ import type {
   SpawnedProcess,
   SpawnRequest,
 } from "./types.js";
-import { mergeWorkerEnv, readRegistryEnvironment, snapshotProcessEnv } from "./userEnv.js";
+import {
+  dropInheritedProxyVars,
+  mergeWorkerEnv,
+  readRegistryEnvironment,
+  snapshotProcessEnv,
+} from "./userEnv.js";
 
 /** workerEnv() 的缓存时长：用户新设了密钥不用重启服务，最多等 60 秒就能生效。 */
 const WORKER_ENV_TTL_MS = 60_000;
@@ -64,7 +69,7 @@ export function createProcessHost(options: ProcessHostOptions): ProcessHost {
 
   async function computeWorkerEnv(): Promise<Record<string, string>> {
     const registryEnv = await readRegistryEnvironment(logger);
-    return mergeWorkerEnv(snapshotProcessEnv(), registryEnv);
+    return mergeWorkerEnv(dropInheritedProxyVars(snapshotProcessEnv()), registryEnv);
   }
 
   /** 起一次 PowerShell 查 WMI 做完整核对；不看也不写缓存，调用方各自决定要不要用缓存。 */
