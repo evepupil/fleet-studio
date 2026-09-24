@@ -55,4 +55,4 @@ opencode models
 - **`-f` 附件参数是数组**，后面要紧跟一个开关参数，否则会把任务正文也吞成附件。fleet 已经按这个顺序拼参数。
 - **`--auto` 会自动放行所有权限**，fleet 派 opencode 时一律带着它，只对你授权过的目录派活。
 
-截至 2026-09 试过不能用的：Grok 系已无额度；`opencode/big-pickle` 用不了；chaosyn 通道已撤除；qoder 系代号别名全部无响应；GPT 系不发工具调用。
+截至 2026-09 试过不能用的：`opencode/big-pickle` 用不了；qoder 系代号别名全部无响应；GPT 系不发工具调用；旧的 chaosyn 通道已撤除，Grok 系当时已无额度。2026-09-24 新接的 chaosyn 网关（mini-cpa）只配了 pi，哪些模型能用见 `pi.md` 的通道一节。
