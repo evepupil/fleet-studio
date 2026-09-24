@@ -52,6 +52,17 @@
   white-space: nowrap;
 }
 
+/*
+ * 用量补充行专用：字号、颜色、上边距和 .extra 一致，但不做单行省略——
+ * 格子窄的时候要能按 UsageBreakdown 的整项（输入 / 输出 / 缓存）换行，数字不能被截断。
+ */
+.extraWrap {
+  margin: 2px 0 0;
+  font-size: var(--fs-11);
+  line-height: var(--lh-11);
+  color: var(--text-3);
+}
+
 .extraMono {
   margin: 2px 0 0;
   font-family: var(--font-mono);

@@ -1,4 +1,6 @@
+import type { PoolView } from "@fleet/core";
 import { describe, expect, it } from "vitest";
+import { formatTokens } from "../../lib/format";
 import { WIKI } from "./records";
 import { buildDemoScenario, DEMO_SCENARIOS } from "./scenarios";
 
@@ -59,6 +61,16 @@ describe("演示场景 busy", () => {
     expect(timeline.filter((event) => event.kind === "tool_call")).toHaveLength(8);
     expect(timeline.filter((event) => event.kind === "run_start")).toHaveLength(2);
     expect(timeline.filter((event) => event.kind === "run_end")).toHaveLength(2);
+  });
+
+  it("今日用量拆分：dsf 输入 1.1M · 输出 480.4K · 缓存 672.6K；glm 输入 93.6K · 输出 40.1K · 缓存 56.2K", () => {
+    // 交互检查第 13 条按这两行文字断言；缓存只算缓存读，和苦工详情的用量写法一致
+    const breakdown = (pool: PoolView | undefined): string | null =>
+      pool === undefined
+        ? null
+        : `输入 ${formatTokens(pool.usageToday.inputTokens)} · 输出 ${formatTokens(pool.usageToday.outputTokens)} · 缓存 ${formatTokens(pool.usageToday.cacheReadTokens)}`;
+    expect(breakdown(dsf)).toBe("输入 1.1M · 输出 480.4K · 缓存 672.6K");
+    expect(breakdown(glm)).toBe("输入 93.6K · 输出 40.1K · 缓存 56.2K");
   });
 
   it("每个快照里的苦工都有详情和时间线", () => {

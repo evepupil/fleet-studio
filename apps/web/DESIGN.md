@@ -149,6 +149,7 @@ apps/web/src/
 | `components/Skeleton.tsx` | `Skeleton` | `{ width?: number \| string; height: number; radius?: "sm" \| "md" }`。纯色块 `--bg-hover`，无动画。 |
 | `components/Banner.tsx` | `Banner` | `{ kind: "offline" \| "config"; children: ReactNode }`。高 `--banner-h`、左右内边距 `--sp-4`、背景 `--st-warning-soft`、下边 1px `--line`；图标 `WifiOff`（offline）或 `TriangleAlert`（config）14px `--st-warning`；文字 `--fs-12` `--text-1`，单行省略。根元素 `data-banner={kind}`。 |
 | `components/AppBar.tsx` | `AppBar` | 无参数。见页面层 R1。 |
+| `components/UsageBreakdown.tsx` | `UsageBreakdown` | `{ usage: Usage }`。渲染 `<span data-usage-breakdown>`，内容「输入 {in} · 输出 {out} · 缓存 {cacheRead}」：三个数字都用 `formatTokens`，等宽 + `tabular-nums`；「缓存」只算缓存读（`cacheReadTokens`）。「输入 {in}」这样的每一项内部不断开，项与项之间可以换行；标签和数字之间是真正的空格字符（交互检查按 `textContent` 找「输入 1.1M」这样的子串）；分隔符「 · 」。**字号和颜色继承父元素，组件自己不定**，由调用处决定。容量条第 3 列第 5 行和苦工详情「用量」的补充行共用它。 |
 | `components/CopyButton.tsx` | `CopyButton` | `{ text: string; label: string }`。24px 方形幽灵按钮，图标 `Copy` 14px `--text-3`；点击写剪贴板后 1.5 秒内图标换成 `Check`（`--st-done`）。`aria-label={label}`。 |
 
 ### 4.4 数据层契约（地基路照写，各路只准读 store）
@@ -236,6 +237,7 @@ pnpm --filter @fleet/web build      # 构建由主控统一跑
 
 ## 8. 文件写入边界与分路表
 
+- **维护期（M2 完成后）：** 公共文件的增改由主控在任务书里指定由哪一路来做，不再限定地基路；下面的边界只约束并行开发期。
 - **公共文件（只有地基路能写，其余各路一律不准碰）：** `src/main.tsx`、`src/App.tsx`、`src/App.module.css`、`src/styles/base.css`、`src/api/dataSource.ts`、`src/api/liveSource.ts`、`src/api/pickSource.ts`、`src/api/demo/demoSource.ts`、`src/state/**`、`src/lib/**`、`src/components/**`、仓库根 `vitest.config.ts`（只加一条 `apps/web/src/**/*.test.ts` 进 include）。
 - **主控独占：** `src/styles/tokens.css`、`src/api/demo/records.ts`、`src/api/demo/timelines.ts`、`src/api/demo/scenarios.ts`、`src/api/demo/scenarios.test.ts`、本文件、`design/工作区.md`。
 - 每路只写分给自己的文件；要拆子组件，只能放在自己的目录、以自己的区域名开头。

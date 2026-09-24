@@ -1,0 +1,9 @@
+/* 字号、颜色由调用处的上下文决定，这里只管「标签 + 数字」这一项内部不断开、数字等宽对齐。 */
+.item {
+  white-space: nowrap;
+}
+
+.number {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}

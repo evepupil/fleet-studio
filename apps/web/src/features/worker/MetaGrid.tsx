@@ -2,6 +2,7 @@ import type { Snapshot, WorkerDetail } from "@fleet/core";
 import { MonoPath } from "../../components/MonoPath";
 import { ProjectDot } from "../../components/ProjectDot";
 import { Tip } from "../../components/Tip";
+import { UsageBreakdown } from "../../components/UsageBreakdown";
 import { formatCost, formatTokens } from "../../lib/format";
 import { selectProjectByKey } from "../../state/selectors";
 import { useSnapshotStore } from "../../state/snapshotStore";
@@ -14,6 +15,7 @@ const {
   value,
   valueMono,
   extra,
+  extraWrap,
   extraMono,
   projectName,
   projectNameText,
@@ -115,10 +117,8 @@ export function MetaGrid({ detail }: MetaGridProps) {
             </>
           )}
         </dd>
-        <dd className={extra}>
-          输入 <span className={mono}>{formatTokens(usage.inputTokens)}</span> · 输出{" "}
-          <span className={mono}>{formatTokens(usage.outputTokens)}</span> · 缓存{" "}
-          <span className={mono}>{formatTokens(usage.cacheReadTokens)}</span>
+        <dd className={extraWrap}>
+          <UsageBreakdown usage={usage} />
         </dd>
       </div>
     </dl>

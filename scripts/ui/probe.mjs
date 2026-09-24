@@ -100,6 +100,21 @@ try {
     (await text('[data-pool="dsf"] [data-pool-health]')).includes("失败 9"),
     true,
   );
+
+  // 13：今日用量拆分成输入、输出、缓存；两个池和苦工详情共用同一个组件
+  await browser.open(distUrl(ROOT, "?demo=busy", "#/w/wk3m7p"), 1500);
+  const oneSpace = (value) => value.replace(/s+/g, " ");
+  check(
+    "13a dsf 今日用量拆分",
+    oneSpace(await text('[data-pool="dsf"] [data-pool-usage-breakdown]')),
+    "输入 1.1M · 输出 480.4K · 缓存 672.6K",
+  );
+  check(
+    "13b glm 今日用量拆分",
+    oneSpace(await text('[data-pool="glm"] [data-pool-usage-breakdown]')),
+    "输入 93.6K · 输出 40.1K · 缓存 56.2K",
+  );
+  check("13c 拆分组件共用", await count("[data-usage-breakdown]"), 3);
 } catch (error) {
   console.error("探针执行出错：", error.message);
   process.exitCode = 1;

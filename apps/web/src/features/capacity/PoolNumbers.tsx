@@ -1,6 +1,7 @@
 import type { PoolHealth, PoolView, ProjectView, QueueShare } from "@fleet/core";
 import { ProjectDot } from "../../components/ProjectDot";
 import { Tip } from "../../components/Tip";
+import { UsageBreakdown } from "../../components/UsageBreakdown";
 import { formatCost, formatTokens } from "../../lib/format";
 import styles from "./PoolNumbers.module.css";
 
@@ -40,7 +41,7 @@ interface HealthEntry {
   tone: HealthTone;
 }
 
-/** 第 3 列：占用大数字、排队、健康度、今日用量四行，为 0 的行整行不显示。 */
+/** 第 3 列：占用大数字、排队、健康度、今日用量、用量拆分五行，为 0 的行整行不显示。 */
 export function PoolNumbers({ pool, projectByKey }: PoolNumbersProps) {
   const over = pool.running > pool.capacity;
   const cost = formatCost(pool.usageToday.costUsd);
@@ -67,6 +68,11 @@ export function PoolNumbers({ pool, projectByKey }: PoolNumbersProps) {
         <div className={usageRow} data-pool-usage>
           今日 {formatTokens(pool.usageToday.totalTokens)} tokens
           {cost !== null && <> · {cost}</>}
+        </div>
+      )}
+      {pool.usageToday.totalTokens > 0 && (
+        <div className={usageRow} data-pool-usage-breakdown>
+          <UsageBreakdown usage={pool.usageToday} />
         </div>
       )}
     </div>
