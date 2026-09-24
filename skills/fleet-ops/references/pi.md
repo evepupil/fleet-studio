@@ -20,23 +20,28 @@ fleet 拉起 pi 时会自动补上用户级环境变量，所以终端里读不�
 - 上下文长度是扩展里估的，报超长就把任务拆细，或者调那个数字。
 - 密钥存成用户级环境变量，扩展里写 `$变量名`。fleet 每次拉起苦工前重新读一遍，新设的变量不用重启服务。
 - 新通道的域名要加进 `~/.fleet-studio/worker.env` 的 `NO_PROXY`，让苦工的模型请求直连（见联网工具一节）。
+- 扩展里的 `api` 按网关的请求格式写：Chat Completions 格式写 `openai-completions`，Responses 格式写 `openai-responses`（照抄 `manyrouter-provider.ts`）。
 
 | 通道 | 地址 | 扩展文件 | 密钥变量 | 登记的模型 |
 |---|---|---|---|---|
 | mcgrox | `https://www.mcgrox.top/v1` | `mcgrox-provider.ts` | `MCGROX_API_KEY` | deepseek-v4.1-flash |
 | chaosyn（mini-cpa 网关） | `https://mini-cpa.chaosyn.com/v1` | `chaosyn-provider.ts` | `CHAOSYN_API_KEY` | GLM-5.3-Flash、Grok 4.6 |
 | snow（朋友自建：vLLM 外面套 new-api 网关） | `https://snow.fcsaidt.de/v1` | `snow-provider.ts` | `SNOW_API_KEY` | qwen3.8-27b |
+| manyrouter（chaosyn 的另一个网关，Responses 格式） | `https://manyrouter.chaosyn.com/v1` | `manyrouter-provider.ts` | `MANY_KEY` | gpt-6-luna |
 
 chaosyn 网关上的 Grok 4.7 和 Grok 4.7 Fast 没登记（2026-09-24 实测）：两个都会丢掉调用方的系统提示词，模型只认网关塞进去的「Claude Code」身份；Grok 4.7 还把工具调用当成正文 JSON 吐出来，十几次里只成功 1 次。Grok 4.6 两项都正常。
 
 snow 是朋友自己机器上的服务，别人也在用，别拿它长时间满载跑大批活。2026-09-24 接入时实测：系统提示词能送到（系统和开发者两种身份都行），工具调用和多轮回传正常；服务端上下文上限 256K，扩展里按 128K 登记；推理档位只认一部分，要翻译（见下一节）。另外两个小现象：不给工具时模型会把工具调用写成正文（苦工总带着工具，不受影响）；本机用 curl 打它要加 `--ssl-no-revoke`，否则证书吊销检查连不上会直接报错（pi 不受影响）。
+
+manyrouter 是唯一走 Responses 格式的通道。2026-09-25 接入时实测：网关会在每个请求前自己塞一段约 4400 token 的内置指令，调用方的系统提示词照样送得到（系统和开发者两种身份都行）；工具调用、带加密思考内容的多轮回传、流式输出都正常，缓存能命中；七个推理档位都认（`minimal` 服务端当成关思考）。域名已被 `worker.env` 里的 `.chaosyn.com` 盖住，不用另加。上下文上限没实测，按 128K 登记。苦工回报里的文件路径常写成 markdown 链接。同一网关还挂着 gpt-6-sol、gpt-6-astra、gpt-5.x 系列和 DeepSeek-V4-Flash 等，要用照同样的步骤测过再登记。
 
 ## 推理档位
 
 - 七档：`off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`。
 - 全局默认在 `~/.pi/agent/settings.json` 的 `defaultThinkingLevel`，已从 `medium` 改成 `max`：当前苦工模型在低档位下判断力明显不够。
 - fleet 派活时 `--thinking <档位>` 覆盖这一次；配置里 `defaults.thinking` 可以统一覆盖。
-- **有的服务只认一部分档位，发了不认的直接 400。** 例如 snow 只认 `low` / `medium` / `xhigh` / `none`。模型没写档位对照表时，pi 只放出 `off` 到 `high` 五档，`max` 会被压成 `high` 发出去，撞上这种服务苦工第一个请求就失败。接新模型时拿各档位实打一次（`reasoning_effort` 参数），不认的在扩展的模型里写 `thinkingLevelMap` 逐档翻译：值写服务认的档位名，写 `null` 表示不支持这一档，`off` 对应关思考时发的值。写法照抄 `snow-provider.ts`。
+- **有的服务只认一部分档位，发了不认的直接 400。** 例如 snow 只认 `low` / `medium` / `xhigh` / `none`。模型没写档位对照表时，pi 只放出 `off` 到 `high` 五档，`max` 会被压成 `high` 发出去，撞上这种服务苦工第一个请求就失败。接新模型时拿各档位实打一次（Chat Completions 格式是 `reasoning_effort` 参数，Responses 格式是 `reasoning.effort`），不认的在扩展的模型里写 `thinkingLevelMap` 逐档翻译：值写服务认的档位名，写 `null` 表示不支持这一档，`off` 对应关思考时发的值。写法照抄 `snow-provider.ts`。
+- **服务全认也要写对照表**：`xhigh`、`max` 两档只有写进对照表 pi 才会发，否则全局默认的 `max` 照样被压成 `high`。manyrouter 的 gpt-6-luna 七档全认，扩展里就只写了这两档。
 
 ## 联网工具
 
@@ -101,6 +106,16 @@ pi install npm:pi-web-access
 | 15 路 | 完成的 2 条用了 16、17 分钟 | 21 分钟时还有 13 条没完，取消了 | 远低于上面两档 |
 
 裸接口压测看 15 路也跑得动，写长代码的总产出还更高；真派苦工却是路数越多越慢，多半是真实苦工上下文长，路数一多朋友那边的缓存装不下，每轮都要从头重读。容量取 5：裸接口的并发上限 6 打八折是 5，真派也是这一档每分钟干完的最多。接入时经 fleet 各派一条只读侦察和写代码，都在 1 分 12 秒左右干完，回报格式对，没有重试。
+
+### manyrouter 的 gpt-6-luna（池 luna，容量 8，2026-09-25）
+
+| 压法 | 结果 |
+|---|---|
+| 同一时刻打出 4 / 8 个带工具的流式请求（8 个压了 2 次） | 全过，首字中位约 3 秒 |
+| 同一时刻 10 个，压了 2 次 | 全过，最慢一个 6 秒 |
+| 8 路各自连续发，压 90 秒，压了 2 轮 | 第一轮 210 个过 197 个，掉的 13 个是同一时刻一起连不上（约 10 秒连接超时），像是网络抖了一下；第二轮 271 个全过，约 2.7 请求/秒，单个中位 2.4 秒 |
+
+容量 8 是用户定的，也对得上规矩：10 路全过，打八折正好 8，没再往上探。经 fleet 用和 qwen27 同一套题各派一条，推理档位是全局默认的 max：只读侦察 2 分 14 秒，写代码 1 分 42 秒（7 个测试全过），回报格式对，没有重试。
 
 ## 已知的坑
 
