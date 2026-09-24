@@ -101,6 +101,16 @@ export const DEFAULT_CONFIG: FleetConfigInput = {
       },
       opencode: {},
     },
+    {
+      // 唯一既能联网搜索又能写文件的角色，所以不屏蔽任何工具。
+      id: "collector",
+      label: "收集",
+      description: "上网找资料，整理成任务书指定的文件，每条带出处",
+      pi: {
+        appendSystemPrompt: `${BUILTIN_PREFIX}roles/collector.md`,
+      },
+      opencode: {},
+    },
   ],
   runtimes: {
     pi: { command: null },

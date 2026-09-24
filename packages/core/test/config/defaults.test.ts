@@ -45,13 +45,14 @@ describe("DEFAULT_CONFIG", () => {
     });
   });
 
-  it("五个角色编号齐全，顺序和规格表一致", () => {
+  it("六个角色编号齐全，顺序和规格表一致", () => {
     expect(DEFAULT_CONFIG.roles.map((role) => role.id)).toEqual([
       "worker",
       "scout",
       "reviewer",
       "fixer",
       "tester",
+      "collector",
     ]);
   });
 
@@ -72,6 +73,13 @@ describe("DEFAULT_CONFIG", () => {
     const scout = DEFAULT_CONFIG.roles.find((role) => role.id === "scout");
     expect(scout?.pi?.excludeTools).toEqual(["write", "edit"]);
     expect(scout?.opencode).toEqual({ agent: "scout" });
+  });
+
+  it("collector 角色能联网也能写文件，不屏蔽任何工具", () => {
+    const collector = DEFAULT_CONFIG.roles.find((role) => role.id === "collector");
+    expect(collector?.pi?.excludeTools).toBeUndefined();
+    expect(collector?.pi?.tools).toBeUndefined();
+    expect(collector?.opencode).toEqual({});
   });
 
   it("fixer 角色不联网，opencode 没有指定 agent", () => {
