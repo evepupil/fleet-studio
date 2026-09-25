@@ -40,5 +40,8 @@ function closeServer(server: ServerType): Promise<void> {
         resolve();
       }
     });
+    // 停止监听不会断开正在推送的 SSE；浏览器一直开着时，旧服务会永远等在这里。
+    // 关停响应已在 finish 后才触发停服，可以关闭存量连接，让流的中止清理正常执行。
+    if ("closeAllConnections" in server) server.closeAllConnections();
   });
 }
