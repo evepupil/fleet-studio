@@ -38,7 +38,7 @@ fleet open               # 打开看板，默认 http://127.0.0.1:4870
 - 起不来先看 `daemon.log`。命令本身找不到（`where fleet` 没结果），到仓库里 `pnpm build` 后运行 `node scripts/install-shims.mjs`。
 - 服务只监听本机；会改变状态的接口要带本机令牌，令牌只存在 `daemon.json` 里。
 - 服务重启不丢排队；在跑的苦工进程还活着就接着跟踪，接管不了的判失败并写明原因。
-- 结束的苦工默认保留 7 天（配置里的 `retentionDays`），到期后记录和输出文件一起清掉。
+- 结束的苦工的原始输出（`runs/` 下的 `out.jsonl`、`err.log`、`task.md`）默认保留 7 天（配置里的 `rawOutputRetentionDays`），到期只清这些文件；任务记录和时间线永久保留。旧名字 `retentionDays` 仍能读。
 
 ## 三、池子
 
@@ -51,7 +51,9 @@ fleet pool set dsf --capacity 0      # 暂停放行，在跑的不打断
 fleet pool set dsf --per-project 8   # 单个项目最多占 8 个；写 none 表示不限
 ```
 
-加一个池：在 `config.json` 的 `pools` 里加一项，保存即生效。
+加一个池：在 `config.json` 的 `pools` 里加一项，保存即生效。`pools` 数组里的先后就是派活优先级，新接的池加在最后。
+
+- **停用和调顺序**：`enabled: false` 停用（在跑的跑完、不再接新活、点名它派活当场报错）；平时不用改配置，在看板槽位页上点启停和上移下移，改完自动写回配置，并在 `config-backups/` 留一份备份。
 
 ```json
 {
@@ -69,7 +71,7 @@ fleet pool set dsf --per-project 8   # 单个项目最多占 8 个；写 none �
 
 - `id` 以小写字母开头，只用小写字母、数字和短横线，最长 32 个字符。`capacity` 取 0～500，0 表示暂停放行。
 - `runtimes` 只写 pi。opencode 已停用（第五节），池里不写它，`--runtime opencode` 就派不进去。
-- `runTimeoutMin`、`queueTimeoutMin` 写 null 就沿用全局默认（`defaults` 里：运行 30 分钟，排队不限时）。默认池在 `defaults.pool`。
+- `runTimeoutMin`、`queueTimeoutMin` 写 null 就沿用全局默认（`defaults` 里：运行 30 分钟，排队不限时）。配置里的 `defaults.pool` 已废弃，写了也会被忽略。
 - **容量怎么定**：同一时刻打出 N 个带工具的请求，一档一档往上加，每次都全过的最高档就是并发上限；容量取上限打八折，再按这个路数连续压一两分钟确认不掉。数字记进 `references/pi.md`。加并发不会让活变快：通道吞吐是固定的，多开的只是排队。
 - **自建的服务还要真派一波验**：裸接口的请求短、上下文小，测不出显存缓存装不下的问题。拿同一批小活按候选容量各派一波，比每分钟干完几条，取最多的那档。qwen27 裸接口压 15 路全过，真派 15 条侦察，21 分钟只干完 2 条；5 路时同样的活每条 4～6 分钟。
 - **配置写坏了**：服务继续用上一份有效配置，看板顶部会提示错在哪，`daemon.log` 里也有。

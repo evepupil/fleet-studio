@@ -1,6 +1,6 @@
 # 接入层 · skill 与苦工提示词
 
-> 模块定位：注入模型上下文的两类规矩——教主会话怎么谈设计、怎么经 fleet 派活的六份 skill，和苦工的六个角色提示词；以及把它们装进宿主的脚本 · 对应代码：`skills/`、`roles/`、`scripts/install-skills.mjs`、`scripts/install-roles.mjs`、`packages/cli/test/skills.test.ts` · 所属里程碑：[M4 fleet 系列 skill 与苦工提示词](../roadmap.md#m4) · 状态：进行中（skill 已装到 Claude Code、苦工提示词已切到仓库，等用户试用；2026-09-25 已装到 Codex，等在 Codex 里实测）· 最近更新：2026-09-25
+> 模块定位：注入模型上下文的两类规矩——教主会话怎么谈设计、怎么经 fleet 派活的六份 skill，和苦工的六个角色提示词；以及把它们装进宿主的脚本 · 对应代码：`skills/`、`roles/`、`scripts/install-skills.mjs`、`scripts/install-roles.mjs`、`packages/cli/test/skills.test.ts` · 所属里程碑：[M4 fleet 系列 skill 与苦工提示词](../roadmap.md#m4)、[M5 第二版底座](../roadmap.md#m5) · 状态：进行中（skill 已装到 Claude Code、苦工提示词已切到仓库，等用户试用；2026-09-25 已装到 Codex，等在 Codex 里实测）· 最近更新：2026-09-25
 
 ## 1. 职责与边界
 
@@ -106,6 +106,24 @@ fleet-ops（通道和运行时，维护时用）
 - 把 Claude Code 的无头模式接成第三种运行时、开一个强模型池，这样强模型苦工也经过闸门、显示在看板上。属于需求变更。
 - 进度流水将来要给「现状卡」一类汇总用时，可能要把六项固定成可解析的格式。
 
+## 第二版（M5）：派活不再有「默认池」
+
+> 所属里程碑：[M5](../roadmap.md#m5) · 依据：[功能清单](../功能清单.md) 11.3、11.4
+
+要改的地方（行号以 2026-09-25 侦察时为准，改前先核对）：
+
+| 文件 | 改成 |
+|---|---|
+| `skills/fleet-dispatch/SKILL.md` 第二节表格「默认池（便宜模型）」 | 「不点名池：fleet 按池的优先级挑有空位的（便宜模型）」 |
+| 同上「强模型：fleet 里有强模型池就 `--pool` 选它」 | 不变 |
+| 同上第四节「常用选项：`--pool <池>` 换池」 | 「`--pool <池>` 点名某个池（一般不用：不点名时 fleet 按优先级挑有空位的池，满了顺延）」；并补一句：点名了停用的池会当场报错，换一个或不点名；续接沿用原来的池 |
+| 同上第八节「排队是正常的」 | 补一句：不点名的活在所有池都满时进公共排队，哪个池先空出来就给哪个 |
+| `skills/fleet-ops/SKILL.md` 第三节「池子」 | 写明：池在 `config.json` 里 `pools` 的先后就是派活优先级；新接的池加在最后；`enabled: false` 停用（在跑的跑完、不再接新活、点名会报错）；停用和调顺序平时在看板槽位页上点，改完自动写回配置并在 `config-backups/` 留备份；删掉「默认池在 `defaults.pool`」这句，改成「配置里的 `defaults.pool` 已废弃，写了也会被忽略」 |
+| 同上 | 保留期：`retentionDays` 改名为 `rawOutputRetentionDays`，只管原始输出（out.jsonl、err.log、task.md），任务记录和时间线永久保留；旧名字仍能读 |
+| `skills/fleet-ui-build/SKILL.md`「区块路是照抄活，默认池就够」 | 「区块路是照抄活，不点名池就够」 |
+
+要求：只改上面这些意思，其余文字不动；不新增 fleet 子命令或选项的写法（门禁 `packages/cli/test/skills.test.ts` 会检查）。改完在 [skill 与苦工提示词](接入层-skill与苦工提示词.md) 的改动历史里记一行。
+
 ## 7. 改动历史
 
 | 日期 | 改动 |
@@ -119,5 +137,8 @@ fleet-ops（通道和运行时，维护时用）
 | 2026-09-24 | 六个角色的提示词精简成「一句话职责、限制、回报格式」三段，做法类要求交给任务书；fleet-ops 写明这条规矩，fleet-dispatch 提醒任务书别堆用不着的做法要求 |
 | 2026-09-24 | fleet-dispatch 加「探索的活怎么拆」，写代码之外的调研按对象拆成多路并行；fleet-discuss 的调研示例、前端设计参考、界面规格参考同步改成一个站一路 |
 | 2026-09-25 | fleet-discuss 回复格式：字母和「5.1」这类编号的条目每行开头加「- 」，修掉连着几行被显示成一整段的问题 |
+| 2026-09-25 | 第二版（M5）规格定稿，待实现 |
+| 2026-09-25 | 派活不再有「默认池」：fleet-dispatch 改成不点名按池的优先级挑、点名停用的池会报错、不点名的活在所有池满时进公共排队；fleet-ops 写明池的先后即优先级、停用与调顺序在看板槽位页上做并写回配置留备份、`defaults.pool` 已废弃、保留期改名 `rawOutputRetentionDays` 只管原始输出；fleet-ui-build 的「默认池就够」改成「不点名池就够」 |
 | 2026-09-25 | fleet-dispatch 开头加「拆活由主会话判断，多路同时派，不让一个苦工包圆」，删掉「强模型一路能吃下一整个子系统」 |
 | 2026-09-25 | 六份 skill 装到 Codex，旧的 pi-fleet、fleet-build、auto-delegate 挪进备份；fleet-discuss 写明 Codex 里出图工具叫 g2i、没有 archify 就画文字图 |
+| 2026-09-25 | 第二版：fleet-dispatch、fleet-ops、fleet-ui-build 去掉默认池说法，写明优先级、停用、公共排队和只清理原始输出 |
