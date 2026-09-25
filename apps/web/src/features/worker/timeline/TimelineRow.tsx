@@ -1,38 +1,23 @@
 import { Brain, CircleX, MessageSquare, RotateCw, Terminal } from "lucide-react";
 import type { ReactNode } from "react";
-import { formatClock, formatShortDuration } from "../../../lib/format";
-import type { TimelineRow as TimelineRowData } from "../../../lib/timelineView";
+import { formatClock, formatShortDuration } from "@/lib/format";
+import type { TimelineRow as TimelineRowData } from "@/lib/timelineView";
 import { RunDivider } from "./RunDivider";
-import styles from "./TimelineRow.module.css";
 import { ToolRow } from "./ToolRow";
-
-const {
-  grid,
-  time,
-  iconMuted,
-  iconWarning,
-  iconFailed,
-  content,
-  textBlock,
-  toggle,
-  thinkingCollapsed,
-  thinkingLabel,
-  thinkingFirstLine,
-  thinkingExpanded,
-  thinkingFull,
-  retryLine,
-  retryLabel,
-  sep,
-  retryMessage,
-  retryRight,
-  errorText,
-  outputContent,
-  outputStream,
-  outputText,
-} = styles;
 
 /** 文字行超过这个行数才折叠 */
 const TEXT_MAX_LINES = 8;
+
+/** 行底色按类型分三档：重试黄底、报错红底、其余不着色。完整类名写在映射里，不做拼接。 */
+const TONE_CLASS: Readonly<Record<"neutral" | "warning" | "failed", string>> = {
+  neutral: "",
+  warning: "rounded-sm bg-status-warning-soft px-2",
+  failed: "rounded-sm bg-status-failed-soft px-2",
+};
+
+/** 四列网格：时间 / 图标 / 内容 / 右侧附加信息；< 1024px 去掉第 4 列，附加信息落到第 3 列下一行。 */
+const GRID_CLASS =
+  "grid grid-cols-[56px_16px_minmax(0,1fr)] items-start gap-x-2.5 py-1.5 lg:grid-cols-[64px_16px_minmax(0,1fr)_auto]";
 
 type GenericRow = Exclude<TimelineRowData, { kind: "run" } | { kind: "tool" }>;
 
@@ -44,7 +29,7 @@ export interface TimelineRowProps {
   onToggle(key: string): void;
   /** 这一行是不是全部工具行里的最后一个，只有它可能转圈 */
   isLastTool: boolean;
-  /** 苦工此刻是否在工作中 */
+  /** 苦工此刻是否在工作 */
   workerRunning: boolean;
 }
 
@@ -76,12 +61,17 @@ export function TimelineRow({
 
   return (
     <li data-timeline-row data-kind={row.kind} data-seq={row.seq}>
-      <div className={grid} data-tone={toneFor(row.kind)}>
-        <span className={time}>{formatClock(row.at, now)}</span>
+      <div
+        className={`${GRID_CLASS} ${TONE_CLASS[toneFor(row.kind)]}`}
+        data-tone={toneFor(row.kind)}
+      >
+        <span className="font-mono text-12 text-fg-3">{formatClock(row.at, now)}</span>
         {renderIcon(row)}
         {renderContent(row, expanded, onToggle)}
         {row.kind === "retry" && row.delayMs !== null && (
-          <span className={retryRight}>{formatShortDuration(row.delayMs)}后</span>
+          <span className="col-start-3 row-start-2 mt-0.5 self-start font-mono text-12 whitespace-nowrap text-fg-3 lg:col-start-4 lg:row-start-1 lg:mt-0">
+            {formatShortDuration(row.delayMs)}后
+          </span>
         )}
       </div>
     </li>
@@ -101,15 +91,15 @@ function toneFor(kind: GenericRow["kind"]): "neutral" | "warning" | "failed" {
 function renderIcon(row: GenericRow): ReactNode {
   switch (row.kind) {
     case "text":
-      return <MessageSquare aria-hidden size={14} className={iconMuted} />;
+      return <MessageSquare aria-hidden size={14} className="mt-[3px] text-fg-3" />;
     case "thinking":
-      return <Brain aria-hidden size={14} className={iconMuted} />;
+      return <Brain aria-hidden size={14} className="mt-[3px] text-fg-3" />;
     case "retry":
-      return <RotateCw aria-hidden size={14} className={iconWarning} />;
+      return <RotateCw aria-hidden size={14} className="mt-[3px] text-status-warning" />;
     case "error":
-      return <CircleX aria-hidden size={14} className={iconFailed} />;
+      return <CircleX aria-hidden size={14} className="mt-[3px] text-status-failed" />;
     case "output":
-      return <Terminal aria-hidden size={14} className={iconMuted} />;
+      return <Terminal aria-hidden size={14} className="mt-[3px] text-fg-3" />;
     default:
       return null;
   }
@@ -149,14 +139,17 @@ function TextContent({
 }: ContentProps<Extract<TimelineRowData, { kind: "text" }>>) {
   const overflow = row.text.split("\n").length > TEXT_MAX_LINES;
   return (
-    <div className={content}>
-      <p className={textBlock} data-clamped={overflow && !expanded ? "true" : "false"}>
+    <div className="flex min-w-0 flex-col items-start gap-1">
+      <p
+        data-clamped={overflow && !expanded ? "true" : "false"}
+        className={`m-0 w-full min-w-0 text-13 wrap-anywhere whitespace-pre-wrap text-fg-1 ${overflow && !expanded ? "line-clamp-8" : ""}`}
+      >
         {row.text}
       </p>
       {overflow && (
         <button
           type="button"
-          className={toggle}
+          className="text-12 text-brand hover:underline"
           aria-expanded={expanded}
           onClick={() => onToggle(row.key)}
         >
@@ -177,38 +170,40 @@ function ThinkingContent({
     return (
       <button
         type="button"
-        className={thinkingCollapsed}
+        className="inline-flex max-w-full min-w-0 items-center gap-1"
         aria-expanded={expanded}
         onClick={() => onToggle(row.key)}
       >
-        <span className={thinkingLabel}>思考</span>
-        <span className={thinkingFirstLine}>{firstLine}</span>
+        <span className="shrink-0 text-12 text-fg-3">思考</span>
+        <span className="min-w-0 truncate text-12 text-fg-3 italic">{firstLine}</span>
       </button>
     );
   }
   return (
-    <div className={thinkingExpanded}>
+    <div className="flex w-full min-w-0 flex-col items-start gap-1">
       <button
         type="button"
-        className={thinkingLabel}
+        className="text-12 text-fg-3"
         aria-expanded={expanded}
         onClick={() => onToggle(row.key)}
       >
         思考
       </button>
-      <p className={thinkingFull}>{row.text}</p>
+      <p className="m-0 max-h-[320px] w-full min-w-0 overflow-y-auto text-12 wrap-anywhere whitespace-pre-wrap text-fg-2">
+        {row.text}
+      </p>
     </div>
   );
 }
 
 function RetryContent({ row }: { row: Extract<TimelineRowData, { kind: "retry" }> }) {
   return (
-    <span className={retryLine}>
-      <span className={retryLabel}>
+    <span className="block w-full min-w-0 truncate text-12">
+      <span className="font-medium text-status-warning">
         重试 {row.attempt}/{row.max}
       </span>
-      <span className={sep}> · </span>
-      <span className={retryMessage} title={row.message}>
+      <span className="text-fg-3"> · </span>
+      <span className="text-fg-2" title={row.message}>
         {row.message}
       </span>
     </span>
@@ -217,7 +212,10 @@ function RetryContent({ row }: { row: Extract<TimelineRowData, { kind: "retry" }
 
 function ErrorContent({ row }: { row: Extract<TimelineRowData, { kind: "error" }> }) {
   return (
-    <p className={errorText} title={row.message}>
+    <p
+      className="m-0 line-clamp-4 w-full min-w-0 text-13 wrap-anywhere whitespace-pre-wrap text-fg-1"
+      title={row.message}
+    >
       {row.message}
     </p>
   );
@@ -225,9 +223,11 @@ function ErrorContent({ row }: { row: Extract<TimelineRowData, { kind: "error" }
 
 function OutputContent({ row }: { row: Extract<TimelineRowData, { kind: "output" }> }) {
   return (
-    <div className={outputContent} title={row.text}>
-      <span className={outputStream}>{row.stream}</span>
-      <p className={outputText}>{row.text}</p>
+    <div className="flex w-full min-w-0 flex-col gap-0.5" title={row.text}>
+      <span className="font-mono text-11 text-fg-3">{row.stream}</span>
+      <p className="m-0 line-clamp-4 min-w-0 font-mono text-12 wrap-anywhere whitespace-pre-wrap text-fg-2">
+        {row.text}
+      </p>
     </div>
   );
 }

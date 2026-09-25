@@ -1,26 +1,30 @@
-import type { Snapshot, TimelineEvent, WorkerDetail } from "@fleet/core";
-import { API_PATHS, SSE_EVENTS } from "@fleet/core";
+import type {
+  PoolView,
+  ProjectInfo,
+  Snapshot,
+  StatsQuery,
+  StatsResponse,
+  TaskPage,
+  TasksQuery,
+  TimelineEvent,
+  WorkerDetail,
+  WorkerSummary,
+} from "@fleet/core";
+import { API_PATHS, DASHBOARD_TOKEN_META, SSE_EVENTS, TOKEN_HEADER } from "@fleet/core";
 import type { ConnectionState, DataSource, WorkerHandlers } from "./dataSource";
-
-/**
- * 真实数据源：全局快照走一条 SSE，单个苦工的详情先 fetch 一次再叠一条 SSE。
- * 两条流都用同一套退避重连节奏：断线后 1、2、4、8、10、10…秒重试，重连时不丢弃已经知道的数据。
- */
 
 const RECONNECT_DELAYS_SEC: readonly number[] = [1, 2, 4, 8, 10];
 const FALLBACK_DELAY_SEC = 10;
 
 function reconnectDelayMs(attempt: number): number {
   const index = Math.min(attempt, RECONNECT_DELAYS_SEC.length - 1);
-  const seconds = RECONNECT_DELAYS_SEC[index] ?? FALLBACK_DELAY_SEC;
-  return seconds * 1000;
+  return (RECONNECT_DELAYS_SEC[index] ?? FALLBACK_DELAY_SEC) * 1000;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-/** SSE 自定义事件名不在 EventSourceEventMap 里，浏览器类型只给得出 Event；用类型守卫收窄到 MessageEvent。 */
 function isMessageEvent(event: Event): event is MessageEvent<unknown> {
   return "data" in event;
 }
@@ -36,11 +40,6 @@ function parseJson(raw: unknown): unknown {
   }
 }
 
-/**
- * 最基本校验：是对象、关键字段类型对；不做深层字段校验，不合格直接丢弃这条消息。
- * 用解构而不是下标读字段：`noPropertyAccessFromIndexSignature` 不让点号访问索引签名类型，
- * 解构出来的本地变量就是普通标识符，两边（严格模式和 lint）都满意。
- */
 function isSnapshot(value: unknown): value is Snapshot {
   if (!isRecord(value)) {
     return false;
@@ -82,15 +81,163 @@ function extractTimelineEvents(value: unknown): TimelineEvent[] | null {
     return null;
   }
   const { events } = value;
-  if (!Array.isArray(events)) {
-    return null;
+  return Array.isArray(events) ? events.filter(isTimelineEvent) : null;
+}
+
+function isWorkerSummary(value: unknown): value is WorkerSummary {
+  if (!isRecord(value)) {
+    return false;
   }
-  return events.filter(isTimelineEvent);
+  const { id, projectKey, title, status, runSeq, createdAt, usage } = value;
+  return (
+    typeof id === "string" &&
+    typeof projectKey === "string" &&
+    typeof title === "string" &&
+    (status === "queued" ||
+      status === "running" ||
+      status === "completed" ||
+      status === "failed" ||
+      status === "cancelled") &&
+    typeof runSeq === "number" &&
+    typeof createdAt === "string" &&
+    isRecord(usage)
+  );
+}
+
+function isStatsResponse(value: unknown): value is StatsResponse {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const {
+    range,
+    dimension,
+    granularity,
+    buckets,
+    total,
+    today,
+    tokenShare,
+    tasksByProject,
+    tokenTrend,
+  } = value;
+  return (
+    isRecord(range) &&
+    (dimension === "model" ||
+      dimension === "channel" ||
+      dimension === "project" ||
+      dimension === "role") &&
+    (granularity === "hour" || granularity === "day" || granularity === "week") &&
+    Array.isArray(buckets) &&
+    isRecord(total) &&
+    isRecord(today) &&
+    Array.isArray(tokenShare) &&
+    Array.isArray(tasksByProject) &&
+    Array.isArray(tokenTrend)
+  );
+}
+
+function isTaskPage(value: unknown): value is TaskPage {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const { items, nextCursor, total } = value;
+  return (
+    Array.isArray(items) &&
+    items.every(isWorkerSummary) &&
+    (typeof nextCursor === "string" || nextCursor === null) &&
+    typeof total === "number"
+  );
+}
+
+function isProjects(value: unknown): value is ProjectInfo[] {
+  return (
+    Array.isArray(value) &&
+    value.every((item) => {
+      if (!isRecord(item)) {
+        return false;
+      }
+      const { key, path, name, colorIndex } = item;
+      return (
+        typeof key === "string" &&
+        typeof path === "string" &&
+        typeof name === "string" &&
+        typeof colorIndex === "number"
+      );
+    })
+  );
+}
+
+function isPoolView(value: unknown): value is PoolView {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const { id, enabled, capacity, slots } = value;
+  return (
+    typeof id === "string" &&
+    typeof enabled === "boolean" &&
+    typeof capacity === "number" &&
+    Array.isArray(slots)
+  );
+}
+
+function isPoolViews(value: unknown): value is PoolView[] {
+  return Array.isArray(value) && value.every(isPoolView);
+}
+
+function appendQuery(path: string, query: object): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined) {
+      params.set(key, String(value));
+    }
+  }
+  const serialized = params.toString();
+  return serialized.length > 0 ? `${path}?${serialized}` : path;
+}
+
+async function requestError(response: Response): Promise<Error> {
+  const fallback = `请求失败（状态码 ${response.status}）`;
+  try {
+    const payload: unknown = await response.json();
+    if (isRecord(payload)) {
+      const { error } = payload;
+      if (isRecord(error)) {
+        const { message } = error;
+        if (typeof message === "string") {
+          return new Error(message);
+        }
+      }
+    }
+  } catch {
+    return new Error(fallback);
+  }
+  return new Error(fallback);
+}
+
+async function requestJson<T>(
+  url: string,
+  guard: (value: unknown) => value is T,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(url, init);
+  if (!response.ok) {
+    throw await requestError(response);
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!guard(payload)) {
+    throw new Error("返回的数据格式不对");
+  }
+  return payload;
+}
+
+function dashboardToken(): string | null {
+  return (
+    document.querySelector<HTMLMetaElement>(`meta[name="${DASHBOARD_TOKEN_META}"]`)?.content ?? null
+  );
 }
 
 function subscribeSnapshot(
   onSnapshot: (snapshot: Snapshot) => void,
-  onConnection: (state: ConnectionState) => void,
+  onConnection: (connection: ConnectionState) => void,
 ): () => void {
   let closed = false;
   let source: EventSource | null = null;
@@ -98,32 +245,37 @@ function subscribeSnapshot(
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let connected = false;
 
-  function handleDisconnect(): void {
-    source?.close();
-    source = null;
-    if (connected) {
-      connected = false;
-      onConnection("lost");
-    }
-    if (closed) {
+  function scheduleReconnect(failedSource: EventSource): void {
+    if (closed || source !== failedSource) {
       return;
     }
-    const delay = reconnectDelayMs(attempt);
+    source = null;
+    failedSource.close();
+    connected = false;
+    onConnection("lost");
+    if (retryTimer !== null) {
+      return;
+    }
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      connect();
+    }, reconnectDelayMs(attempt));
     attempt += 1;
-    retryTimer = setTimeout(connect, delay);
   }
 
   function connect(): void {
     if (closed) {
       return;
     }
+    onConnection("connecting");
     const nextSource = new EventSource(API_PATHS.stream);
+    source = nextSource;
     nextSource.addEventListener(SSE_EVENTS.snapshot, (event) => {
-      if (!isMessageEvent(event)) {
+      if (closed || source !== nextSource || !isMessageEvent(event)) {
         return;
       }
-      const data = parseJson(event.data);
-      if (!isSnapshot(data)) {
+      const snapshot = parseJson(event.data);
+      if (!isSnapshot(snapshot)) {
         return;
       }
       attempt = 0;
@@ -131,20 +283,19 @@ function subscribeSnapshot(
         connected = true;
         onConnection("open");
       }
-      onSnapshot(data);
+      onSnapshot(snapshot);
     });
-    nextSource.onerror = handleDisconnect;
-    source = nextSource;
+    nextSource.onerror = () => scheduleReconnect(nextSource);
   }
 
   connect();
-
   return () => {
     closed = true;
     if (retryTimer !== null) {
       clearTimeout(retryTimer);
     }
     source?.close();
+    source = null;
   };
 }
 
@@ -160,18 +311,19 @@ function subscribeWorker(id: string, after: number, handlers: WorkerHandlers): (
       return;
     }
     const nextSource = new EventSource(`${API_PATHS.workerStream(id)}?after=${maxSeq}`);
+    source = nextSource;
     nextSource.addEventListener(SSE_EVENTS.worker, (event) => {
-      if (!isMessageEvent(event)) {
+      if (closed || source !== nextSource || !isMessageEvent(event)) {
         return;
       }
-      const data = parseJson(event.data);
-      if (!isWorkerDetail(data)) {
-        return;
+      const detail = parseJson(event.data);
+      if (isWorkerDetail(detail)) {
+        attempt = 0;
+        handlers.onDetail(detail);
       }
-      handlers.onDetail(data);
     });
     nextSource.addEventListener(SSE_EVENTS.timeline, (event) => {
-      if (!isMessageEvent(event)) {
+      if (closed || source !== nextSource || !isMessageEvent(event)) {
         return;
       }
       const events = extractTimelineEvents(parseJson(event.data));
@@ -179,23 +331,26 @@ function subscribeWorker(id: string, after: number, handlers: WorkerHandlers): (
         return;
       }
       for (const item of events) {
-        if (item.seq > maxSeq) {
-          maxSeq = item.seq;
-        }
+        maxSeq = Math.max(maxSeq, item.seq);
       }
+      attempt = 0;
       handlers.onEvents(events);
     });
     nextSource.onerror = () => {
-      nextSource.close();
-      source = null;
-      if (closed) {
+      if (closed || source !== nextSource) {
         return;
       }
-      const delay = reconnectDelayMs(attempt);
+      source = null;
+      nextSource.close();
+      if (retryTimer !== null) {
+        return;
+      }
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        openStream();
+      }, reconnectDelayMs(attempt));
       attempt += 1;
-      retryTimer = setTimeout(openStream, delay);
     };
-    source = nextSource;
   }
 
   async function start(): Promise<void> {
@@ -219,20 +374,19 @@ function subscribeWorker(id: string, after: number, handlers: WorkerHandlers): (
       handlers.onError(`加载失败（状态码 ${response.status}）`);
       return;
     }
-    const data = await response.json().catch(() => null);
+    const payload: unknown = await response.json().catch(() => null);
     if (closed) {
       return;
     }
-    if (!isWorkerDetail(data)) {
+    if (!isWorkerDetail(payload)) {
       handlers.onError("返回的数据格式不对");
       return;
     }
-    handlers.onDetail(data);
+    handlers.onDetail(payload);
     openStream();
   }
 
-  start();
-
+  void start();
   return () => {
     closed = true;
     if (retryTimer !== null) {
@@ -242,10 +396,40 @@ function subscribeWorker(id: string, after: number, handlers: WorkerHandlers): (
   };
 }
 
+function setPoolEnabled(poolId: string, enabled: boolean): Promise<PoolView> {
+  const token = dashboardToken();
+  return requestJson(API_PATHS.poolEnabled(poolId), isPoolView, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      ...(token === null ? {} : { [TOKEN_HEADER]: token }),
+    },
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+function reorderPools(poolIds: readonly string[]): Promise<PoolView[]> {
+  const token = dashboardToken();
+  return requestJson(API_PATHS.poolOrder, isPoolViews, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      ...(token === null ? {} : { [TOKEN_HEADER]: token }),
+    },
+    body: JSON.stringify({ poolIds }),
+  });
+}
+
 export function createLiveDataSource(): DataSource {
   return {
     subscribeSnapshot,
     subscribeWorker,
     fixedNow: () => null,
+    getStats: (query: StatsQuery) =>
+      requestJson(appendQuery(API_PATHS.stats, query), isStatsResponse),
+    getTasks: (query: TasksQuery) => requestJson(appendQuery(API_PATHS.tasks, query), isTaskPage),
+    getProjects: () => requestJson(API_PATHS.projects, isProjects),
+    setPoolEnabled,
+    reorderPools,
   };
 }

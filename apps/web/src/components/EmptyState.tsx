@@ -1,29 +1,33 @@
-import styles from "./EmptyState.module.css";
+import type { LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-const { root, message: messageClass, command: commandClass, action: actionClass } = styles;
-
-export interface EmptyStateAction {
-  label: string;
-  onClick(): void;
-}
-
-export interface EmptyStateProps {
+interface EmptyStateProps {
   message: string;
   command?: string;
-  action?: EmptyStateAction;
+  action?: { label: string; onClick(): void };
+  icon?: LucideIcon;
 }
 
-/** 空态 / 错误态统一画法：区域居中的一句短句，最多再跟一行命令，不配插图。 */
-export function EmptyState({ message, command, action }: EmptyStateProps) {
+function EmptyState({ message, command, action, icon: Icon }: EmptyStateProps) {
   return (
-    <div className={root} data-empty>
-      <p className={messageClass}>{message}</p>
-      {command !== undefined && <p className={commandClass}>{command}</p>}
-      {action !== undefined && (
-        <button type="button" className={actionClass} onClick={action.onClick}>
+    <section
+      data-empty
+      className="flex flex-col items-center justify-center gap-2 py-12 text-center"
+    >
+      {Icon ? <Icon aria-hidden="true" className="size-5 text-fg-3" /> : null}
+      <p className="text-13 text-fg-2">{message}</p>
+      {command ? (
+        <code className="rounded-sm bg-raised px-1.5 py-0.5 font-mono text-12 text-fg-1">
+          {command}
+        </code>
+      ) : null}
+      {action ? (
+        <Button type="button" variant="link" onClick={action.onClick} className="text-brand">
           {action.label}
-        </button>
-      )}
-    </div>
+        </Button>
+      ) : null}
+    </section>
   );
 }
+
+export { EmptyState };

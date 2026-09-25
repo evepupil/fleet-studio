@@ -1,37 +1,49 @@
 import { Check, Copy } from "lucide-react";
-import { useState } from "react";
-import styles from "./CopyButton.module.css";
+import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 
-const { root, done, icon } = styles;
-
-export interface CopyButtonProps {
+interface CopyButtonProps {
   text: string;
   label: string;
+  showText?: boolean;
 }
 
-const CONFIRM_MS = 1500;
-
-/** 24px 方形幽灵按钮：点击写剪贴板，短暂换成勾表示复制成功。 */
-export function CopyButton({ text, label }: CopyButtonProps) {
+function CopyButton({ text, label, showText = false }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function handleClick(): void {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), CONFIRM_MS);
-      })
-      .catch(() => undefined);
+  useEffect(
+    () => () => {
+      if (timer.current !== null) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  async function copy(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      if (timer.current !== null) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
   }
 
+  const Icon = copied ? Check : Copy;
   return (
-    <button type="button" className={root} aria-label={label} onClick={handleClick}>
-      {copied ? (
-        <Check aria-hidden size={14} className={done} />
-      ) : (
-        <Copy aria-hidden size={14} className={icon} />
-      )}
-    </button>
+    <Button
+      type="button"
+      variant="ghost"
+      size="xs"
+      aria-label={label}
+      title={label}
+      onClick={() => void copy()}
+    >
+      <Icon aria-hidden="true" className={copied ? "text-status-done" : "text-fg-3"} />
+      {showText ? <span className="font-mono text-12">{text}</span> : null}
+    </Button>
   );
 }
+
+export { CopyButton };

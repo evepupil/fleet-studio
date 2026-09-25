@@ -109,6 +109,39 @@ export async function launchBrowser(port) {
       await rpc("Page.navigate", { url });
       await sleep(waitMs);
     },
+    async reload() {
+      await rpc("Page.reload");
+    },
+    async pressKey(key) {
+      const keyData = {
+        Enter: { code: "Enter", windowsVirtualKeyCode: 13 },
+        Escape: { code: "Escape", windowsVirtualKeyCode: 27 },
+        ArrowDown: { code: "ArrowDown", windowsVirtualKeyCode: 40 },
+        ArrowUp: { code: "ArrowUp", windowsVirtualKeyCode: 38 },
+      }[key];
+      if (!keyData) throw new Error(`不支持的按键：${key}`);
+      await rpc("Input.dispatchKeyEvent", {
+        type: "keyDown",
+        key,
+        ...keyData,
+        ...(key === "Enter" ? { text: "\r", unmodifiedText: "\r" } : {}),
+      });
+      await rpc("Input.dispatchKeyEvent", { type: "keyUp", key, ...keyData });
+    },
+    async waitFor(expression, timeoutMs = 3000, intervalMs = 50) {
+      const deadline = Date.now() + timeoutMs;
+      do {
+        try {
+          if (await this.evaluate(expression)) return true;
+        } catch {
+          // Navigation can briefly leave Runtime without an execution context.
+        }
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) return false;
+        await sleep(Math.min(intervalMs, remaining));
+      } while (Date.now() <= deadline);
+      return false;
+    },
     async evaluate(expression) {
       const result = await rpc("Runtime.evaluate", {
         expression,

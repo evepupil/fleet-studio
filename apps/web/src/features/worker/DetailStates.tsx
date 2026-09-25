@@ -1,7 +1,4 @@
-import { Skeleton } from "../../components/Skeleton";
-import styles from "./DetailStates.module.css";
-
-const { titleBlock, metaBlock, metaCell, timelineBlock } = styles;
+import { Skeleton } from "@/components/ui/skeleton";
 
 const META_SKELETON_KEYS = ["s1", "s2", "s3", "s4", "s5", "s6"] as const;
 const TIMELINE_SKELETON_KEYS = ["t1", "t2", "t3", "t4", "t5"] as const;
@@ -13,21 +10,21 @@ const TIMELINE_SKELETON_KEYS = ["t1", "t2", "t3", "t4", "t5"] as const;
 export function DetailLoadingSkeleton() {
   return (
     <div>
-      <div className={titleBlock}>
-        <Skeleton width="60%" height={20} />
-        <Skeleton width="40%" height={16} />
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-5 w-3/5 rounded-sm" />
+        <Skeleton className="h-4 w-2/5 rounded-sm" />
       </div>
-      <div className={metaBlock}>
+      <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-6 gap-y-3 border-y border-line py-3 lg:grid-cols-[repeat(auto-fill,minmax(168px,1fr))]">
         {META_SKELETON_KEYS.map((key) => (
-          <div key={key} className={metaCell}>
-            <Skeleton width="40%" height={10} />
-            <Skeleton width="70%" height={14} />
+          <div key={key} className="flex min-w-0 flex-col gap-0.5">
+            <Skeleton className="h-2.5 w-2/5 rounded-sm" />
+            <Skeleton className="h-3.5 w-7/10 rounded-sm" />
           </div>
         ))}
       </div>
-      <div className={timelineBlock}>
+      <div className="mt-4 flex flex-col gap-2">
         {TIMELINE_SKELETON_KEYS.map((key) => (
-          <Skeleton key={key} width="100%" height={20} />
+          <Skeleton key={key} className="h-5 w-full rounded-sm" />
         ))}
       </div>
     </div>

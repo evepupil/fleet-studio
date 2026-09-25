@@ -1,20 +1,13 @@
 import { useMemo, useState } from "react";
-import { EmptyState } from "../../../components/EmptyState";
-import { Skeleton } from "../../../components/Skeleton";
-import {
-  buildTimelineRows,
-  countTimelineRows,
-  filterTimelineRows,
-} from "../../../lib/timelineView";
-import { useNow } from "../../../state/nowStore";
-import { useWorkerStore } from "../../../state/workerStore";
+import { EmptyState } from "@/components/EmptyState";
+import { Skeleton } from "@/components/ui/skeleton";
+import { buildTimelineRows, countTimelineRows, filterTimelineRows } from "@/lib/timelineView";
+import { useNow } from "@/state/nowStore";
+import { useWorkerStore } from "@/state/workerStore";
 import { JumpToLatest } from "./JumpToLatest";
-import styles from "./Timeline.module.css";
 import { TimelineHeader } from "./TimelineHeader";
 import { TimelineRow } from "./TimelineRow";
 import { useFollowScroll } from "./useFollowScroll";
-
-const { root, list, loadMoreRow, loadMoreButton, skeletonList, empty } = styles;
 
 /** 行数超过这个数才截断，只渲染最后这么多行 */
 const MAX_VISIBLE_ROWS = 1000;
@@ -22,8 +15,8 @@ const MAX_VISIBLE_ROWS = 1000;
 const SKELETON_KEYS = ["a", "b", "c", "d", "e"];
 
 /**
- * R8 时间线：本页停留最久的区域。事件的合并、筛选、计数交给 lib/timelineView 的纯函数
- * （地基路已实现并配了单测），这里只管渲染、展开状态和跟随滚动这些界面层的事。
+ * R8 时间线：本页停留最久的区域。事件的合并、筛选、计数交给 lib/timelineView 的纯函数，
+ * 这里只管渲染、展开状态和跟随滚动这些界面层的事。
  */
 export function Timeline() {
   const events = useWorkerStore((state) => state.events);
@@ -100,9 +93,9 @@ export function Timeline() {
   function renderBody() {
     if (status === "loading") {
       return (
-        <div className={skeletonList}>
+        <div className="flex flex-col gap-2 py-3">
           {SKELETON_KEYS.map((key) => (
-            <Skeleton key={key} height={20} />
+            <Skeleton key={key} className="h-5 w-full" />
           ))}
         </div>
       );
@@ -112,13 +105,17 @@ export function Timeline() {
       return null;
     }
     if (rows.length === 0) {
-      return <div className={empty}>{renderEmptyMessage()}</div>;
+      return <div className="min-h-[160px]">{renderEmptyMessage()}</div>;
     }
     return (
-      <div className={list}>
+      <div className="flex flex-col">
         {hiddenCount > 0 && !showAll && (
-          <div className={loadMoreRow}>
-            <button type="button" className={loadMoreButton} onClick={() => setShowAll(true)}>
+          <div className="flex justify-center py-2">
+            <button
+              type="button"
+              className="text-12 text-brand hover:underline"
+              onClick={() => setShowAll(true)}
+            >
               显示更早的 {hiddenCount} 条
             </button>
           </div>
@@ -141,7 +138,7 @@ export function Timeline() {
   }
 
   return (
-    <section className={root} data-timeline aria-label="时间线">
+    <section className="mt-4 flex flex-col" data-timeline aria-label="时间线">
       <TimelineHeader counts={counts} filter={filter} onFilterChange={setFilter} />
       {renderBody()}
       {unreadCount > 0 && <JumpToLatest count={unreadCount} onClick={jumpToLatest} />}

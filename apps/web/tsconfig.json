@@ -10,7 +10,8 @@
     "declaration": false,
     "composite": false,
     "paths": {
-      "@fleet/core": ["../../packages/core/src/index.ts"]
+      "@fleet/core": ["../../packages/core/src/index.ts"],
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src"]

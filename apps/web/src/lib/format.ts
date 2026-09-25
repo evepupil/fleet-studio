@@ -1,3 +1,5 @@
+import type { StatsGranularity } from "@fleet/core";
+
 /**
  * 时长、时间、token 数、费用、路径的显示格式化。全部是纯函数，方便单测锁定边界行为。
  */
@@ -98,4 +100,84 @@ export function elapsedMs(from: string | null, to: string | null, nowMs: number)
   const start = Date.parse(from);
   const end = to === null ? nowMs : Date.parse(to);
   return end - start;
+}
+
+export function formatCompact(value: number): string {
+  if (value < 1000) {
+    return `${value}`;
+  }
+  const scaled = value >= 1_000_000 ? value / 1_000_000 : value / 1000;
+  const suffix = value >= 1_000_000 ? "M" : "K";
+  const rounded = scaled.toFixed(1);
+  return `${rounded.endsWith(".0") ? rounded.slice(0, -2) : rounded}${suffix}`;
+}
+
+export function formatPercent(part: number, total: number): string | null {
+  if (total === 0) {
+    return null;
+  }
+  return `${Math.round((part / total) * 100)}%`;
+}
+
+export function formatLocalDate(date: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date.slice(5) : date;
+}
+
+function localMonthDay(date: Date): string {
+  return `${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function localHourMinute(date: Date): string {
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+export function formatLocalDateOfIso(iso: string): string {
+  const date = new Date(iso);
+  return `${date.getFullYear()}-${localMonthDay(date)}`;
+}
+
+export function formatBucketLabel(iso: string, granularity: StatsGranularity): string {
+  const date = new Date(iso);
+  return granularity === "hour" ? localHourMinute(date) : localMonthDay(date);
+}
+
+export function formatBucketTitle(iso: string, granularity: StatsGranularity): string {
+  const date = new Date(iso);
+  const monthDay = localMonthDay(date);
+  if (granularity === "hour") {
+    return `${monthDay} ${localHourMinute(date)}`;
+  }
+  return granularity === "week" ? `${monthDay} 起一周` : monthDay;
+}
+
+export function formatRangeLabel(
+  range: { kind: string; from?: string; to?: string },
+  nowMs: number,
+): string {
+  switch (range.kind) {
+    case "today":
+      return "今天";
+    case "7d":
+      return "近 7 天";
+    case "30d":
+      return "近 30 天";
+    case "all":
+      return "全部";
+    case "custom": {
+      if (range.from === undefined || range.to === undefined) {
+        return "自选日期";
+      }
+      const fromYear = range.from.slice(0, 4);
+      const toYear = range.to.slice(0, 4);
+      if (fromYear !== toYear) {
+        return `${range.from} ~ ${range.to}`;
+      }
+      const currentYear = `${new Date(nowMs).getFullYear()}`;
+      return fromYear === currentYear
+        ? `${formatLocalDate(range.from)} ~ ${formatLocalDate(range.to)}`
+        : `${range.from} ~ ${range.to}`;
+    }
+    default:
+      return "全部";
+  }
 }

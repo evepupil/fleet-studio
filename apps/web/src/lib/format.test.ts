@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   elapsedMs,
+  formatBucketLabel,
+  formatBucketTitle,
   formatClock,
+  formatCompact,
   formatCost,
   formatDuration,
+  formatLocalDate,
+  formatLocalDateOfIso,
+  formatPercent,
+  formatRangeLabel,
   formatShortDuration,
   formatTokens,
   middleEllipsis,
@@ -112,6 +119,51 @@ describe("middleEllipsis", () => {
     expect(result).toHaveLength(20);
     expect(result.startsWith("C:\\code")).toBe(true);
     expect(result.includes("…")).toBe(true);
+  });
+});
+
+describe("formatCompact", () => {
+  it("千位以下原样，千位和百万位使用紧凑后缀", () => {
+    expect(formatCompact(999)).toBe("999");
+    expect(formatCompact(1200)).toBe("1.2K");
+    expect(formatCompact(1_000_000)).toBe("1M");
+  });
+});
+
+describe("formatPercent", () => {
+  it("按整数百分比四舍五入，总数为零时返回 null", () => {
+    expect(formatPercent(1, 3)).toBe("33%");
+    expect(formatPercent(0, 0)).toBeNull();
+  });
+});
+
+describe("formatLocalDate and formatRangeLabel", () => {
+  it("保留本地日期，不做 UTC 转换", () => {
+    expect(formatLocalDate("2026-09-01")).toBe("09-01");
+  });
+
+  it("格式化预设和跨年自选范围", () => {
+    expect(formatRangeLabel({ kind: "7d" }, 0)).toBe("近 7 天");
+    expect(formatRangeLabel({ kind: "custom", from: "2025-12-30", to: "2026-01-03" }, 0)).toBe(
+      "2025-12-30 ~ 2026-01-03",
+    );
+  });
+});
+
+describe("formatBucketLabel, formatBucketTitle and formatLocalDateOfIso", () => {
+  const hourDate = new Date(2026, 8, 25, 14, 7, 0);
+  const hourIso = hourDate.toISOString();
+  const weekIso = new Date(2026, 8, 22, 0, 0, 0).toISOString();
+
+  it("formats bucket labels and titles in local time", () => {
+    expect(formatBucketLabel(hourIso, "hour")).toBe("14:07");
+    expect(formatBucketLabel(hourIso, "day")).toBe("09-25");
+    expect(formatBucketLabel(weekIso, "week")).toBe("09-22");
+
+    expect(formatBucketTitle(hourIso, "hour")).toBe("09-25 14:07");
+    expect(formatBucketTitle(hourIso, "day")).toBe("09-25");
+    expect(formatBucketTitle(weekIso, "week")).toBe("09-22 起一周");
+    expect(formatLocalDateOfIso(hourIso)).toBe("2026-09-25");
   });
 });
 

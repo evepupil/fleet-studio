@@ -1,23 +1,6 @@
 import type { RunView, Verdict } from "@fleet/core";
 import { Fragment, useLayoutEffect, useRef, useState } from "react";
-import { VerdictTag } from "../../components/VerdictTag";
-import styles from "./ReportCard.module.css";
-
-const {
-  root,
-  header,
-  headerTitle,
-  runLabel,
-  dl,
-  dt,
-  ddCell,
-  verdictLine,
-  clampWrapper,
-  text,
-  textMuted,
-  rawBlock,
-  toggle,
-} = styles;
+import { VerdictTag } from "@/components/VerdictTag";
 
 export interface ReportCardProps {
   run: RunView;
@@ -26,6 +9,12 @@ export interface ReportCardProps {
 
 const DASH_TEXT = "无";
 const VERDICT_SECTION_KEYS: ReadonlySet<string> = new Set(["SELF_REPORT", "VERDICT"]);
+
+/** 折叠行数只有两种取值，写成完整类名映射，不做拼接。 */
+const CLAMP_CLASS: Readonly<Record<10 | 12, string>> = {
+  10: "line-clamp-10",
+  12: "line-clamp-12",
+};
 
 /** 段文字首词是 pass / fail 时拆出结论，供 SELF_REPORT / VERDICT 段单独画 VerdictTag，后面接着画剩余文字。 */
 function splitLeadingVerdict(sectionText: string): { verdict: Verdict; rest: string } | null {
@@ -43,10 +32,8 @@ function splitLeadingVerdict(sectionText: string): { verdict: Verdict; rest: str
 
 interface ClampedTextProps {
   content: string;
-  maxLines: number;
-  // CSS Modules 的类名在 noUncheckedIndexedAccess 下是 string | undefined（索引签名的通用限制），
-  // 这里直接转发给 className，和其余组件的写法一致，不用额外兜底。
-  textClassName: string | undefined;
+  maxLines: 10 | 12;
+  textClassName: string;
 }
 
 /** 超过 maxLines 行才出现「展开全部」；溢出判断用 scrollHeight > clientHeight，内容变化后重新测量。 */
@@ -66,25 +53,16 @@ function ClampedText({ content, maxLines, textClassName }: ClampedTextProps) {
   }, [content, expanded]);
 
   return (
-    <div className={clampWrapper}>
-      <div
-        ref={ref}
-        className={textClassName}
-        style={
-          expanded
-            ? undefined
-            : {
-                display: "-webkit-box",
-                WebkitBoxOrient: "vertical",
-                WebkitLineClamp: maxLines,
-                overflow: "hidden",
-              }
-        }
-      >
+    <div className="min-w-0 flex-1">
+      <div ref={ref} className={`${textClassName} ${expanded ? "" : CLAMP_CLASS[maxLines]}`}>
         {content}
       </div>
       {overflowing && (
-        <button type="button" className={toggle} onClick={() => setExpanded((value) => !value)}>
+        <button
+          type="button"
+          className="mt-1 text-12 text-brand hover:underline"
+          onClick={() => setExpanded((value) => !value)}
+        >
           {expanded ? "收起" : "展开全部"}
         </button>
       )}
@@ -98,14 +76,14 @@ export function ReportCard({ run, runCount }: ReportCardProps) {
   const headerVerdict = report?.verdict ?? null;
 
   return (
-    <section className={root} data-report>
-      <div className={header}>
-        <span className={headerTitle}>回报</span>
+    <section data-report className="mt-4 rounded-lg border border-line bg-raised px-4 py-3.5">
+      <div className="flex items-center gap-2">
+        <span className="text-14 font-semibold text-fg-1">回报</span>
         {headerVerdict !== null && <VerdictTag verdict={headerVerdict} />}
-        {runCount > 1 && <span className={runLabel}>第 {run.seq} 次运行</span>}
+        {runCount > 1 && <span className="ml-auto text-11 text-fg-3">第 {run.seq} 次运行</span>}
       </div>
       {report !== null && (
-        <dl className={dl}>
+        <dl className="mt-3 grid grid-cols-[112px_minmax(0,1fr)] gap-x-3 gap-y-2.5">
           {report.sections.map((section) => {
             const verdictSplit = VERDICT_SECTION_KEYS.has(section.key)
               ? splitLeadingVerdict(section.text)
@@ -113,18 +91,24 @@ export function ReportCard({ run, runCount }: ReportCardProps) {
             const isDash = section.text.trim() === DASH_TEXT;
             return (
               <Fragment key={section.key}>
-                <dt className={dt}>{section.key}</dt>
-                <dd className={ddCell}>
+                <dt className="m-0 font-mono text-11 font-semibold tracking-[0.4px] text-fg-3">
+                  {section.key}
+                </dt>
+                <dd className="m-0 min-w-0">
                   {verdictSplit !== null ? (
-                    <div className={verdictLine}>
+                    <div className="flex items-start gap-2">
                       <VerdictTag verdict={verdictSplit.verdict} />
-                      <ClampedText content={verdictSplit.rest} maxLines={10} textClassName={text} />
+                      <ClampedText
+                        content={verdictSplit.rest}
+                        maxLines={10}
+                        textClassName={TEXT_CLASS}
+                      />
                     </div>
                   ) : (
                     <ClampedText
                       content={section.text}
                       maxLines={10}
-                      textClassName={isDash ? textMuted : text}
+                      textClassName={isDash ? TEXT_MUTED_CLASS : TEXT_CLASS}
                     />
                   )}
                 </dd>
@@ -134,10 +118,13 @@ export function ReportCard({ run, runCount }: ReportCardProps) {
         </dl>
       )}
       {report === null && run.finalText !== null && (
-        <div className={rawBlock}>
-          <ClampedText content={run.finalText} maxLines={12} textClassName={text} />
+        <div className="mt-3">
+          <ClampedText content={run.finalText} maxLines={12} textClassName={TEXT_CLASS} />
         </div>
       )}
     </section>
   );
 }
+
+const TEXT_CLASS = "text-13 wrap-anywhere whitespace-pre-wrap text-fg-1";
+const TEXT_MUTED_CLASS = "text-13 wrap-anywhere whitespace-pre-wrap text-fg-3";

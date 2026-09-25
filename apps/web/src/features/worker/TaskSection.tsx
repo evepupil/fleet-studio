@@ -1,8 +1,5 @@
 import type { WorkerDetail } from "@fleet/core";
-import { Disclosure } from "../../components/Disclosure";
-import styles from "./TaskSection.module.css";
-
-const { root, box } = styles;
+import { WorkerDisclosure } from "./WorkerDisclosure";
 
 export interface TaskSectionProps {
   detail: WorkerDetail;
@@ -33,15 +30,17 @@ export function TaskSection({ detail }: TaskSectionProps) {
     return null;
   }
   return (
-    <section className={root} data-task>
-      <Disclosure
+    <section className="mt-4" data-task>
+      <WorkerDisclosure
         id="task"
         title="任务"
         meta={firstNonEmptyLine(firstRun.prompt)}
         defaultOpen={detail.summary.status === "queued"}
       >
-        <div className={box}>{firstRun.prompt}</div>
-      </Disclosure>
+        <div className="mt-1 max-h-[360px] overflow-y-auto rounded-md border border-line bg-raised px-3.5 py-3 text-13 wrap-anywhere whitespace-pre-wrap text-fg-1">
+          {firstRun.prompt}
+        </div>
+      </WorkerDisclosure>
     </section>
   );
 }

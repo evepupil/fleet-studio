@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { projectColorVar } from "./projectColor";
+import { projectColorVar, seriesColorVar } from "./colors";
 
 describe("projectColorVar", () => {
   it("0~7 原样落到对应变量", () => {
@@ -13,9 +13,14 @@ describe("projectColorVar", () => {
     expect(projectColorVar(23)).toBe("var(--proj-7)");
   });
 
-  it("负数取模仍落在 0~7", () => {
-    expect(projectColorVar(-1)).toBe("var(--proj-7)");
-    expect(projectColorVar(-8)).toBe("var(--proj-0)");
-    expect(projectColorVar(-9)).toBe("var(--proj-7)");
+  it("null 使用其他系列的颜色", () => {
+    expect(seriesColorVar(null)).toBe("var(--series-other)");
+  });
+
+  it("非空索引按 8 个 token 取模", () => {
+    expect(seriesColorVar(0)).toBe("var(--series-0)");
+    expect(seriesColorVar(7)).toBe("var(--series-7)");
+    expect(seriesColorVar(8)).toBe("var(--series-0)");
+    expect(seriesColorVar(-1)).toBe("var(--series-7)");
   });
 });

@@ -1,20 +1,20 @@
-import { elapsedMs, formatDuration } from "../lib/format";
-import { useNow } from "../state/nowStore";
-import styles from "./Duration.module.css";
+import { elapsedMs, formatDuration } from "@/lib/format";
+import { useNow } from "@/state/nowStore";
 
-const { root } = styles;
-
-export interface DurationProps {
-  from: string | null;
+interface DurationProps {
+  ms?: number | null;
+  from?: string | null;
   to?: string | null;
 }
 
-/** 已耗时长：to 为空时跟着全站唯一的时钟实时刷新；from 为空说明还没开始，显示占位符。 */
-export function Duration({ from, to = null }: DurationProps) {
-  const now = useNow();
-  if (from === null) {
-    return <span className={root}>—</span>;
-  }
-  const ms = elapsedMs(from, to, now);
-  return <span className={root}>{ms === null ? "—" : formatDuration(ms)}</span>;
+function Duration({ ms, from, to = null }: DurationProps) {
+  const nowMs = useNow();
+  const duration = ms ?? elapsedMs(from ?? null, to, nowMs);
+  return (
+    <span className="font-mono tabular-nums">
+      {duration === null ? "—" : formatDuration(duration)}
+    </span>
+  );
 }
+
+export { Duration };

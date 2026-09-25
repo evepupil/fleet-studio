@@ -81,9 +81,13 @@ fleet open                          # 在浏览器里打开看板
 ## 开发
 
 ```powershell
-pnpm check                  # 格式、类型、测试、构建、前端写死色值检查，全部通过才能提交
-node scripts/ui/probe.mjs   # 看板交互检查（需先构建）
-node scripts/ui/shoot.mjs   # 看板截图，写到 .fleet/shots/
+pnpm check                         # 格式、类型、测试、构建、前端写死色值检查
+pnpm --filter @fleet/web build    # 截图和交互检查前先构建看板
+pnpm exec biome check scripts/ui
+node scripts/ui/probe.mjs         # 四份设计检查表逐项交互断言
+node scripts/ui/shoot.mjs check   # 截图并检查页面级横向溢出
 ```
 
-看板可以不接服务、直接用演示数据打开构建产物：`apps/web/dist/index.html?demo=busy`（另有 `empty`、`failure`、`offline`）。
+截图写到 `.fleet/shots/<标签>/`；上面的 `check` 标签会生成 `.fleet/shots/check/`。包含 busy 总览、槽位、任务和 `wr8v2k` 详情在 1440、1280、1024、800 宽的浅色与深色截图，以及 empty/disabled 总览和槽位、offline/failure 总览的 1440 浅色截图。发现页面级横向溢出时截图脚本以退出码 1 结束。
+
+看板可以不接服务、直接用演示数据打开构建产物：`apps/web/dist/index.html?demo=busy`（另有 `empty`、`disabled`、`failure`、`offline`）。

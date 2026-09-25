@@ -1,18 +1,11 @@
-import { middleEllipsis } from "../lib/format";
-import styles from "./MonoPath.module.css";
+import { middleEllipsis } from "@/lib/format";
 
-const { root } = styles;
-
-export interface MonoPathProps {
-  path: string;
-  max?: number;
-}
-
-/** 等宽字体的路径，超长中间省略，完整路径放 title 供悬停查看。 */
-export function MonoPath({ path, max = 48 }: MonoPathProps) {
+function MonoPath({ path, max = 48 }: { path: string; max?: number }) {
   return (
-    <span className={root} title={path}>
+    <code title={path} className="font-mono">
       {middleEllipsis(path, max)}
-    </span>
+    </code>
   );
 }
+
+export { MonoPath };

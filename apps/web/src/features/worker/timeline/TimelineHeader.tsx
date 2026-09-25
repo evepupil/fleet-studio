@@ -1,8 +1,5 @@
-import { type FilterChipOption, FilterChips } from "../../../components/FilterChips";
-import type { TimelineFilter } from "../../../lib/timelineView";
-import styles from "./TimelineHeader.module.css";
-
-const { root, title, total, spacer } = styles;
+import type { TimelineFilter } from "@/lib/timelineView";
+import { TimelineFilterControl, type TimelineFilterOption } from "./TimelineFilterControl";
 
 export interface TimelineHeaderProps {
   counts: Record<TimelineFilter, number>;
@@ -17,9 +14,9 @@ const FILTER_OPTION_META: ReadonlyArray<{ value: TimelineFilter; label: string }
   { value: "issues", label: "异常" },
 ];
 
-/** 时间线头部：吸顶展示事件总数和四个筛选小片；计数为 0 的筛选禁用（「全部」永不禁用）。 */
+/** 时间线头部：吸顶展示事件总数和四个筛选段；计数为 0 的段禁用（「全部」永不禁用）。 */
 export function TimelineHeader({ counts, filter, onFilterChange }: TimelineHeaderProps) {
-  const options: FilterChipOption<TimelineFilter>[] = FILTER_OPTION_META.map((meta) => ({
+  const options: TimelineFilterOption[] = FILTER_OPTION_META.map((meta) => ({
     value: meta.value,
     label: meta.label,
     count: counts[meta.value],
@@ -27,17 +24,14 @@ export function TimelineHeader({ counts, filter, onFilterChange }: TimelineHeade
   }));
 
   return (
-    <div className={root} data-timeline-header>
-      <h2 className={title}>时间线</h2>
-      <span className={total}>{counts.all}</span>
-      <span className={spacer} aria-hidden />
-      <FilterChips
-        name="timeline-filter"
-        ariaLabel="时间线筛选"
-        options={options}
-        value={filter}
-        onChange={onFilterChange}
-      />
+    <div
+      data-timeline-header
+      className="sticky top-0 z-[var(--z-sticky)] flex items-center gap-3 border-b border-line bg-panel py-2.5"
+    >
+      <h2 className="m-0 text-14 font-semibold text-fg-1">时间线</h2>
+      <span className="font-mono text-12 text-fg-3">{counts.all}</span>
+      <span className="flex-1" aria-hidden />
+      <TimelineFilterControl options={options} value={filter} onChange={onFilterChange} />
     </div>
   );
 }

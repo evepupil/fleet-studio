@@ -1,0 +1,158 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./tokens.css";
+
+@theme inline {
+  --color-page: var(--bg-page);
+  --color-panel: var(--bg-panel);
+  --color-raised: var(--bg-raised);
+  --color-overlay: var(--bg-overlay);
+  --color-hover: var(--bg-hover);
+  --color-selected: var(--bg-selected);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-meter-track: var(--meter-track);
+  --color-fg-1: var(--text-1);
+  --color-fg-2: var(--text-2);
+  --color-fg-3: var(--text-3);
+  --color-brand: var(--accent);
+  --color-brand-soft: var(--accent-soft);
+  --color-on-brand: var(--on-accent);
+  --color-status-queued: var(--st-queued);
+  --color-status-running: var(--st-running);
+  --color-status-done: var(--st-done);
+  --color-status-failed: var(--st-failed);
+  --color-status-cancelled: var(--st-cancelled);
+  --color-status-warning: var(--st-warning);
+  --color-status-warning-soft: var(--st-warning-soft);
+  --color-status-failed-soft: var(--st-failed-soft);
+  --color-proj-0: var(--proj-0);
+  --color-proj-1: var(--proj-1);
+  --color-proj-2: var(--proj-2);
+  --color-proj-3: var(--proj-3);
+  --color-proj-4: var(--proj-4);
+  --color-proj-5: var(--proj-5);
+  --color-proj-6: var(--proj-6);
+  --color-proj-7: var(--proj-7);
+  --color-series-0: var(--series-0);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-series-5: var(--series-5);
+  --color-series-6: var(--series-6);
+  --color-series-7: var(--series-7);
+  --color-series-other: var(--series-other);
+  --color-scrim: var(--scrim);
+
+  --color-background: var(--bg-page);
+  --color-foreground: var(--text-1);
+  --color-card: var(--bg-panel);
+  --color-card-foreground: var(--text-1);
+  --color-popover: var(--bg-overlay);
+  --color-popover-foreground: var(--text-1);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--on-accent);
+  --color-secondary: var(--bg-raised);
+  --color-secondary-foreground: var(--text-1);
+  --color-muted: var(--bg-hover);
+  --color-muted-foreground: var(--text-3);
+  --color-accent: var(--bg-hover);
+  --color-accent-foreground: var(--text-1);
+  --color-destructive: var(--st-failed);
+  --color-destructive-foreground: var(--text-1);
+  --color-border: var(--line);
+  --color-input: var(--line-strong);
+  --color-ring: var(--accent);
+  --color-chart-1: var(--series-0);
+  --color-chart-2: var(--series-1);
+  --color-chart-3: var(--series-2);
+  --color-chart-4: var(--series-3);
+  --color-chart-5: var(--series-4);
+  --color-chart-6: var(--series-5);
+  --color-chart-7: var(--series-6);
+  --color-chart-8: var(--series-7);
+  --color-sidebar: var(--bg-panel);
+  --color-sidebar-foreground: var(--text-2);
+  --color-sidebar-primary: var(--accent);
+  --color-sidebar-primary-foreground: var(--on-accent);
+  --color-sidebar-accent: var(--bg-selected);
+  --color-sidebar-accent-foreground: var(--accent);
+  --color-sidebar-border: var(--line);
+  --color-sidebar-ring: var(--accent);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --text-11: var(--fs-11);
+  --text-11--line-height: var(--lh-11);
+  --text-12: var(--fs-12);
+  --text-12--line-height: var(--lh-12);
+  --text-13: var(--fs-13);
+  --text-13--line-height: var(--lh-13);
+  --text-14: var(--fs-14);
+  --text-14--line-height: var(--lh-14);
+  --text-16: var(--fs-16);
+  --text-16--line-height: var(--lh-16);
+  --text-22: var(--fs-22);
+  --text-22--line-height: var(--lh-22);
+  --text-28: var(--fs-28);
+  --text-28--line-height: var(--lh-28);
+
+  --spacing: 4px;
+  --breakpoint-md: 800px;
+  --shadow-2xs: 0 0 0 0 transparent;
+  --shadow-xs: 0 0 0 0 transparent;
+  --shadow-sm: 0 0 0 0 transparent;
+  --shadow-md: var(--shadow-overlay);
+  --shadow-lg: var(--shadow-overlay);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-lg);
+  --animate-spin-slow: spin 1.2s linear infinite;
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-page text-13 text-fg-1 font-sans;
+  font-family: var(--font-sans);
+}
+
+[data-shell-content][data-offline="true"] [data-page-body] {
+  opacity: 0.6;
+}
+
+::selection {
+  @apply bg-brand-soft;
+}
+
+:focus-visible {
+  @apply outline-brand outline-2 outline-offset-2;
+}
+
+.hatch {
+  background-image: repeating-linear-gradient(45deg, var(--hatch) 0 1px, transparent 1px 4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin-slow {
+    animation: none;
+  }
+}

@@ -1,46 +1,44 @@
 import type { RetryInfo, RunStatus } from "@fleet/core";
 import { RotateCw } from "lucide-react";
-import { STATUS_META } from "../lib/status";
-import styles from "./StatusBadge.module.css";
+import { STATUS_META } from "@/lib/status";
 
-const { root, iconSlot, spin, reducedDot } = styles;
-
-export interface StatusBadgeProps {
+interface StatusBadgeProps {
   status: RunStatus;
   retry?: RetryInfo | null;
   queuePosition?: number | null;
+  shared?: boolean;
   size?: "sm" | "md";
 }
 
-/**
- * 状态 = 图标 + 彩色状态词，颜色从不单独表达含义（见 docs/前端设计.md 3.2）。
- * 工作中且在重试时换成 RotateCw、警示色，文字变成「重试 N/M」；排队中给出位置时写「排队第 N 位」。
- */
-export function StatusBadge({
+function StatusBadge({
   status,
-  retry = null,
-  queuePosition = null,
+  retry,
+  queuePosition,
+  shared = false,
   size = "md",
 }: StatusBadgeProps) {
   const meta = STATUS_META[status];
-  const retrying = status === "running" && retry !== null;
-  const spinning = status === "running";
-  const Icon = retrying ? RotateCw : meta.icon;
-  const color = retrying ? "var(--st-warning)" : meta.color;
-  const label = retrying
-    ? `重试 ${retry.attempt}/${retry.max}`
-    : status === "queued" && queuePosition !== null
-      ? `排队第 ${queuePosition} 位`
-      : meta.label;
-  const iconSize = size === "sm" ? 12 : 14;
+  const showRetry = status === "running" && retry != null;
+  const Icon = showRetry ? RotateCw : meta.icon;
+  const label =
+    showRetry && retry
+      ? `重试 ${retry.attempt}/${retry.max}`
+      : status === "queued" && queuePosition != null
+        ? `${shared ? "公共排队" : "排队"}第 ${queuePosition} 位`
+        : meta.label;
 
   return (
-    <span className={root} data-status={status} data-size={size} style={{ color }}>
-      <span className={iconSlot}>
-        <Icon aria-hidden size={iconSize} className={spinning ? spin : undefined} />
-        {spinning && <span className={reducedDot} aria-hidden />}
-      </span>
+    <span
+      data-status={status}
+      className={`inline-flex items-center gap-1 whitespace-nowrap ${size === "sm" ? "text-12" : "text-13"} ${showRetry ? "text-status-warning" : meta.badgeClass}`}
+    >
+      <Icon
+        aria-hidden="true"
+        className={`${size === "sm" ? "size-3" : "size-3.5"} ${showRetry ? "animate-spin-slow" : ""}`}
+      />
       {label}
     </span>
   );
 }
+
+export { StatusBadge };

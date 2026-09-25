@@ -43,6 +43,21 @@
   --proj-6: #9085e9;
   --proj-7: #e66767;
 
+  /* 图表系列色：顺序与项目色一致；「其他」单独一色；网格线同发丝线 */
+  --series-0: var(--proj-0);
+  --series-1: var(--proj-1);
+  --series-2: var(--proj-2);
+  --series-3: var(--proj-3);
+  --series-4: var(--proj-4);
+  --series-5: var(--proj-5);
+  --series-6: var(--proj-6);
+  --series-7: var(--proj-7);
+  --series-other: #4a4b52;
+  --chart-grid: var(--line);
+
+  /* 确认框背后的遮罩 */
+  --scrim: rgba(0, 0, 0, 0.5);
+
   /* 重试斜纹：叠在项目色上的半透明细线 */
   --hatch: rgba(11, 12, 14, 0.55);
 
@@ -67,6 +82,8 @@
   --lh-16: 24px;
   --fs-22: 22px;
   --lh-22: 28px;
+  --fs-28: 28px;
+  --lh-28: 36px;
   --fw-regular: 400;
   --fw-medium: 500;
   --fw-semibold: 600;
@@ -86,10 +103,15 @@
   --r-md: 6px;
   --r-lg: 8px;
 
-  /* 尺寸 */
+  /* 尺寸（第二版控制台骨架） */
   --appbar-h: 40px;
   --banner-h: 32px;
-  --sidebar-w: 340px;
+  --sidebar-w: 220px;
+  --sidebar-w-collapsed: 64px;
+  --header-h: 56px;
+  --content-pad: 24px;
+  --card-gap: 16px;
+  --card-pad: 20px;
   --slot-h: 18px;
   --slot-gap: 2px;
 
@@ -142,14 +164,11 @@
     --proj-6: #4a3aa7;
     --proj-7: #e34948;
 
+    --series-other: #c9c8c2;
+    --scrim: rgba(20, 20, 18, 0.3);
+
     --hatch: rgba(255, 255, 255, 0.6);
 
     --shadow-overlay: 0 8px 24px rgba(20, 20, 18, 0.12), 0 0 0 1px #e6e5e0;
-  }
-}
-
-@media (max-width: 1279px) {
-  :root {
-    --sidebar-w: 300px;
   }
 }
