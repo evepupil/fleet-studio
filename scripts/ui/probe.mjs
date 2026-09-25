@@ -1,6 +1,7 @@
 // 第二版看板交互检查：逐项对照 apps/web/design/ 四份页面检查表及任务详情迁移检查。
 // 用法：pnpm --filter @fleet/web build 之后运行 node scripts/ui/probe.mjs
 import { distUrl, launchBrowser } from "./cdp.mjs";
+import { chooseSelectOption } from "./interactions.mjs";
 
 const ROOT = process.cwd();
 const browser = await launchBrowser(Number(process.env.CDP_PORT ?? 9342));
@@ -49,23 +50,7 @@ async function openDemo(scenario, hash) {
 }
 
 async function chooseRadixOption(selector, label) {
-  const opened = await browser.evaluate(`(() => {
-    const trigger = ${q(selector)};
-    if (!trigger) return false;
-    trigger.click();
-    return true;
-  })()`);
-  if (!opened) return false;
-  const listOpened = await browser.waitFor(`!!document.querySelector('[role="listbox"]')`, 3000);
-  if (!listOpened) return false;
-  const selected = await browser.evaluate(`(() => {
-    const option = [...document.querySelectorAll('[role="option"]')]
-      .find((element) => element.textContent.trim() === ${JSON.stringify(label)});
-    if (!option) return false;
-    option.click();
-    return true;
-  })()`);
-  if (!selected) return false;
+  await chooseSelectOption(browser, selector, label);
   return browser.waitFor(
     `${q(selector)}?.textContent.includes(${JSON.stringify(label)}) === true`,
     3000,
@@ -289,7 +274,10 @@ try {
     async () => {
       await openDemo("busy", "#/overview");
       await browser.evaluate(`(() => ${q('[data-stat="queued"]')}?.click())()`);
-      await browser.waitFor('location.hash === "#/tasks"', 3000);
+      await browser.waitFor(
+        `location.hash === "#/tasks" && ${q('[data-filter="status"]')}?.textContent.trim() === "状态：排队中"`,
+        3000,
+      );
       return browser.evaluate(`({
         hash: location.hash,
         filter: ${q('[data-filter="status"]')}?.textContent.trim() ?? null,
@@ -302,7 +290,10 @@ try {
     async () => {
       await openDemo("busy", "#/overview");
       await browser.evaluate(`(() => ${q('[data-stat="retrying"]')}?.click())()`);
-      await browser.waitFor('location.hash === "#/tasks"', 3000);
+      await browser.waitFor(
+        `location.hash === "#/tasks" && ${q('[data-filter="status"]')}?.textContent.trim() === "状态：重试中"`,
+        3000,
+      );
       return browser.evaluate(`({
         hash: location.hash,
         filter: ${q('[data-filter="status"]')}?.textContent.trim() ?? null,
@@ -761,7 +752,10 @@ try {
     "任务：关闭详情返回任务列表并展开表格",
     async () => {
       await browser.evaluate(`(() => ${q("[data-detail-close]")}?.click())()`);
-      await browser.waitFor('location.hash === "#/tasks"', 3000);
+      await browser.waitFor(
+        `location.hash === "#/tasks" && ${q("[data-task-table]")}?.dataset.compact === "false"`,
+        3000,
+      );
       return browser.evaluate(`({
         hash: location.hash,
         compact: ${q("[data-task-table]")}?.dataset.compact ?? null,

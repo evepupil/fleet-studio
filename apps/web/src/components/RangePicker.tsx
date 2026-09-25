@@ -57,6 +57,7 @@ function RangePicker({ value, onChange, variant, name }: RangePickerProps) {
   const nowMs = useNow();
   const [open, setOpen] = useState(false);
   const [monthCount, setMonthCount] = useState(2);
+  const [draftRange, setDraftRange] = useState<DateRange | undefined>();
   const selectedRange = useMemo<DateRange | undefined>(() => {
     const from = fromDateString(value.from);
     const to = fromDateString(value.to);
@@ -67,9 +68,15 @@ function RangePicker({ value, onChange, variant, name }: RangePickerProps) {
   const options = [...PRESET_OPTIONS, { value: "custom" as const, label: customLabel }];
   const selectedLabel = options.find((option) => option.value === selectedValue)?.label ?? "全部";
 
+  function openCalendar(): void {
+    setDraftRange(selectedRange);
+    setMonthCount(window.innerWidth >= 1024 ? 2 : 1);
+    setOpen(true);
+  }
+
   function choose(kind: RangeKind | "custom"): void {
     if (kind === "custom") {
-      setOpen(true);
+      openCalendar();
       return;
     }
     setOpen(false);
@@ -82,18 +89,30 @@ function RangePicker({ value, onChange, variant, name }: RangePickerProps) {
         options={options}
         value={selectedValue}
         onChange={choose}
+        onReselect={(kind) => {
+          if (kind === "custom") openCalendar();
+        }}
         ariaLabel="时间范围"
         name={name}
       />
     ) : (
       <Select
-        value={selectedValue}
+        // 自选项是打开日历的入口，保持可重复选择已应用的日期范围。
+        value={selectedValue === "custom" ? "" : selectedValue}
         onValueChange={(next: string) => choose(next as RangeKind | "custom")}
       >
         <SelectTrigger aria-label="时间范围" className="h-8 w-[180px] bg-panel text-12">
-          <SelectValue>{`时间：${selectedLabel}`}</SelectValue>
+          <SelectValue
+            placeholder={`时间：${selectedLabel}`}
+          >{`时间：${selectedLabel}`}</SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent
+          position="popper"
+          align="start"
+          onCloseAutoFocus={(event) => {
+            if (open) event.preventDefault();
+          }}
+        >
           {options.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               {option.label}
@@ -107,8 +126,8 @@ function RangePicker({ value, onChange, variant, name }: RangePickerProps) {
     <Popover
       open={open}
       onOpenChange={(nextOpen: boolean) => {
-        setOpen(nextOpen);
-        if (nextOpen) setMonthCount(window.innerWidth >= 1024 ? 2 : 1);
+        if (nextOpen) openCalendar();
+        else setOpen(false);
       }}
     >
       <PopoverAnchor asChild>
@@ -117,9 +136,17 @@ function RangePicker({ value, onChange, variant, name }: RangePickerProps) {
       <PopoverContent data-range-calendar align="end" className="w-auto p-0">
         <Calendar
           mode="range"
-          selected={selectedRange}
+          selected={draftRange}
+          defaultMonth={selectedRange?.from ?? new Date(nowMs)}
+          today={new Date(nowMs)}
           numberOfMonths={monthCount}
-          onSelect={(nextRange) => {
+          onSelect={(nextRange, selectedDay) => {
+            // 日历默认第一次点击就返回同日起止；先保存起点，第二次点击再提交。
+            if (draftRange?.from === undefined || draftRange.to !== undefined) {
+              setDraftRange({ from: selectedDay });
+              return;
+            }
+            setDraftRange(nextRange);
             if (nextRange?.from && nextRange.to) {
               onChange({
                 kind: "custom",
@@ -133,7 +160,11 @@ function RangePicker({ value, onChange, variant, name }: RangePickerProps) {
         />
         <div className="flex items-center justify-between gap-3 border-t border-line px-3 py-2 text-12">
           <span className="text-fg-2">
-            {selectedRange?.from ? formatRangeLabel(value, nowMs) : "选择开始和结束日期"}
+            {draftRange?.from && draftRange.to === undefined
+              ? `${toDateString(draftRange.from)} 起，选择结束日期`
+              : selectedRange?.from
+                ? formatRangeLabel(value, nowMs)
+                : "选择开始和结束日期"}
           </span>
           <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
             关闭

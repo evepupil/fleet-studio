@@ -10,6 +10,7 @@ interface SegmentedControlProps<Value extends string> {
   options: readonly SegmentedOption<Value>[];
   value: Value;
   onChange: (value: Value) => void;
+  onReselect?: (value: Value) => void;
   ariaLabel: string;
   name: string;
   size?: "sm" | "md";
@@ -19,6 +20,7 @@ function SegmentedControl<Value extends string>({
   options,
   value,
   onChange,
+  onReselect,
   ariaLabel,
   name,
   size = "md",
@@ -32,6 +34,7 @@ function SegmentedControl<Value extends string>({
       data-control={name}
       onValueChange={(nextValue: string) => {
         if (nextValue !== "") onChange(nextValue as Value);
+        else onReselect?.(value);
       }}
       className={`inline-flex rounded-md border border-line bg-panel p-0.5 ${small ? "h-7" : "h-8"}`}
     >

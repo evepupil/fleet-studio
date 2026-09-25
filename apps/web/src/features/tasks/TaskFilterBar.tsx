@@ -5,7 +5,13 @@ import { useProjects } from "@/api/queries";
 import { ColorDot } from "@/components/ColorDot";
 import { RangePicker } from "@/components/RangePicker";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { projectColorVar } from "@/lib/colors";
 import { useSnapshotStore } from "@/state/snapshotStore";
 import { useTaskFilterStore } from "@/state/taskFilterStore";
@@ -80,7 +86,9 @@ function TaskFilterBar() {
           aria-label="状态"
           className="h-8 w-[136px] bg-panel px-2 text-12"
         >
-          <span className="truncate">状态：{selectedStatus?.label ?? "进行中"}</span>
+          <SelectValue>
+            <span className="truncate">状态：{selectedStatus?.label ?? "进行中"}</span>
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {STATUS_OPTIONS.map((option) => (
@@ -102,11 +110,13 @@ function TaskFilterBar() {
           aria-label="项目"
           className="h-8 w-[168px] bg-panel px-2 text-12"
         >
-          <span className="truncate">
-            {filters.project === undefined
-              ? "全部项目"
-              : (selectedProject?.name ?? filters.project)}
-          </span>
+          <SelectValue>
+            <span className="truncate">
+              {filters.project === undefined
+                ? "全部项目"
+                : (selectedProject?.name ?? filters.project)}
+            </span>
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL_PROJECTS}>全部项目</SelectItem>
@@ -128,9 +138,11 @@ function TaskFilterBar() {
           aria-label="池"
           className="h-8 w-[144px] bg-panel px-2 text-12"
         >
-          <span className="truncate">
-            {filters.pool === undefined ? "全部池" : (selectedPool?.id ?? filters.pool)}
-          </span>
+          <SelectValue>
+            <span className="truncate">
+              {filters.pool === undefined ? "全部池" : (selectedPool?.id ?? filters.pool)}
+            </span>
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL_POOLS}>全部池</SelectItem>
@@ -152,9 +164,11 @@ function TaskFilterBar() {
           aria-label="角色"
           className="h-8 w-[128px] bg-panel px-2 text-12"
         >
-          <span className="truncate">
-            {filters.role === undefined ? "全部角色" : (selectedRole?.label ?? filters.role)}
-          </span>
+          <SelectValue>
+            <span className="truncate">
+              {filters.role === undefined ? "全部角色" : (selectedRole?.label ?? filters.role)}
+            </span>
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL_ROLES}>全部角色</SelectItem>
