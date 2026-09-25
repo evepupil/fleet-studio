@@ -3,12 +3,9 @@
  * （比如 bash 工具临时起的 shell），必须连子进程一起杀（模块设计第 3.4 节）。
  */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { FleetError } from "@fleet/core";
+import { runBackgroundCommand } from "./backgroundCommand.js";
 import { isProcessAlive } from "./processProbe.js";
-
-const execFileAsync = promisify(execFile);
 
 export async function killTree(pid: number): Promise<void> {
   if (process.platform === "win32") {
@@ -26,7 +23,7 @@ export async function killTree(pid: number): Promise<void> {
  */
 async function killTreeWindows(pid: number): Promise<void> {
   try {
-    await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"]);
+    await runBackgroundCommand("taskkill", ["/PID", String(pid), "/T", "/F"]);
     return;
   } catch (error) {
     if (!(await isProcessAlive(pid, null))) {

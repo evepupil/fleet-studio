@@ -4,11 +4,8 @@
  * 拿到这个号的时刻」。这里只提供纯函数和批量查询，怎么用在 processHost.ts 里组装。
  */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { runBackgroundCommand } from "./backgroundCommand.js";
 import type { ProcessIdentity } from "./types.js";
-
-const execFileAsync = promisify(execFile);
 
 /** 核对创建时间时允许的误差：我们的系统时钟和 WMI 报告的创建时间可能有轻微偏差。 */
 export const IDENTITY_CLOCK_TOLERANCE_MS = 2000;
@@ -82,7 +79,7 @@ async function defaultQuery(pids: readonly number[]): Promise<string> {
   const command =
     `Get-CimInstance Win32_Process -Filter "${filter}" | ` +
     `ForEach-Object { "{0}|{1}|{2}" -f $_.ProcessId, $_.Name, ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() }`;
-  const { stdout } = await execFileAsync("powershell", [
+  const { stdout } = await runBackgroundCommand("powershell", [
     "-NoProfile",
     "-NonInteractive",
     "-Command",

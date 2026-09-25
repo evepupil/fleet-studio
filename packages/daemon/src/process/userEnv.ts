@@ -6,11 +6,8 @@
  * 安全要求：这个文件产生的任何日志、错误信息都不准出现变量的值，最多写变量名。
  */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import type { Logger } from "../app/types.js";
-
-const execFileAsync = promisify(execFile);
+import { runBackgroundCommand } from "./backgroundCommand.js";
 
 const HKLM_ENVIRONMENT_KEY =
   "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment";
@@ -129,7 +126,7 @@ export async function readRegistryEnvironment(logger: Logger): Promise<Record<st
 
 async function queryRegistrySafe(keyPath: string, logger: Logger): Promise<RegistryEntry[]> {
   try {
-    const { stdout } = await execFileAsync("reg", ["query", keyPath]);
+    const { stdout } = await runBackgroundCommand("reg", ["query", keyPath]);
     return parseRegQueryOutput(stdout);
   } catch (error) {
     logger.warn(`读取注册表环境变量失败：${keyPath}（${describeError(error)}）`);

@@ -6,15 +6,12 @@
  * 多行任务（docs/调研/pi-运行时.md 第 1、2 节；docs/调研/opencode-运行时.md 第 1 节）。
  */
 
-import { execFile } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { promisify } from "node:util";
 import type { FleetConfig, RuntimeId } from "@fleet/core";
 import { FleetError } from "@fleet/core";
+import { runBackgroundCommand } from "./backgroundCommand.js";
 import type { ResolvedCommand } from "./types.js";
-
-const execFileAsync = promisify(execFile);
 
 export interface RuntimeResolverOptions {
   getConfig: () => FleetConfig;
@@ -104,10 +101,10 @@ async function resolveNpmGlobalRoot(injected: string | undefined): Promise<strin
       }
     }
     // npm 在 Windows 上是 .cmd 外壳；这是唯一允许经过 cmd.exe 的命令，字符串不含任何外部输入。
-    const { stdout } = await execFileAsync("cmd.exe", ["/d", "/s", "/c", "npm root -g"]);
+    const { stdout } = await runBackgroundCommand("cmd.exe", ["/d", "/s", "/c", "npm root -g"]);
     return stdout.trim();
   }
-  const { stdout } = await execFileAsync("npm", ["root", "-g"]);
+  const { stdout } = await runBackgroundCommand("npm", ["root", "-g"]);
   return stdout.trim();
 }
 

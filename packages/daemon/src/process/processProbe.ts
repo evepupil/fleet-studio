@@ -3,10 +3,7 @@
  * 其他平台靠 kill(pid, 0) 是否抛异常（模块设计第 3.5 节）。
  */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
+import { runBackgroundCommand } from "./backgroundCommand.js";
 
 /** tasklist /FO CSV 输出的一行，只保留判断存活用得到的两个字段。 */
 export interface TasklistEntry {
@@ -18,7 +15,13 @@ export async function isProcessAlive(pid: number, image: string | null): Promise
   if (process.platform !== "win32") {
     return isProcessAlivePosix(pid);
   }
-  const { stdout } = await execFileAsync("tasklist", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"]);
+  const { stdout } = await runBackgroundCommand("tasklist", [
+    "/FI",
+    `PID eq ${pid}`,
+    "/FO",
+    "CSV",
+    "/NH",
+  ]);
   const entry = parseTasklistCsv(stdout).find((candidate) => candidate.pid === pid);
   if (entry === undefined) {
     return false;
