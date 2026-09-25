@@ -22,10 +22,10 @@ describe("runOpenCommand", () => {
     expect(exitCode).toBe(EXIT_CODE.ok);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.command).toBe("rundll32");
-    expect(calls[0]?.args).toEqual(["url.dll,FileProtocolHandler", harness.stub.baseUrl]);
-    expect(
-      harness.deps.stdoutLines.some((line) => line.includes(harness?.stub.baseUrl ?? "")),
-    ).toBe(true);
+    // 默认进总览页（规格第二版 4）。
+    const url = `${harness.stub.baseUrl}/#/overview`;
+    expect(calls[0]?.args).toEqual(["url.dll,FileProtocolHandler", url]);
+    expect(harness.deps.stdoutLines).toContain(`已打开 ${url}`);
   });
 
   it("--help 时只打印用法，不连服务也不打开任何东西", async () => {

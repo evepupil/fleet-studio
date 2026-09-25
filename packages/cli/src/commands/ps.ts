@@ -5,7 +5,7 @@ import type { CommandDeps } from "../context.js";
 import { ensureDaemon } from "../daemon/discover.js";
 import { EXIT_CODE } from "../errors.js";
 import { elapsedMs, formatDuration } from "../format/duration.js";
-import { describeStatus } from "../format/statusLine.js";
+import { describeStatus, formatPoolSegment } from "../format/statusLine.js";
 import { renderTable } from "../format/table.js";
 import { resolveHome } from "../home.js";
 import { resolveProject } from "../project.js";
@@ -96,7 +96,7 @@ export async function runPsCommand(argv: readonly string[], deps: CommandDeps): 
     worker.id,
     describeStatus(worker),
     worker.roleLabel,
-    worker.poolId,
+    formatPoolSegment(worker),
     formatDuration(elapsedMs(worker, now)),
     worker.title,
     worker.activity ?? "-",

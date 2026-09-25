@@ -7,6 +7,7 @@ import {
   createCommandHarness,
   HARNESS_TOKEN,
 } from "../support/commandHarness.js";
+import { fakeDetail, fakeRun } from "../support/fixtures.js";
 import { findRequest } from "../support/stubServer.js";
 
 function fakeWorker(overrides: Partial<WorkerSummary> = {}): WorkerSummary {
@@ -18,8 +19,11 @@ function fakeWorker(overrides: Partial<WorkerSummary> = {}): WorkerSummary {
     role: "worker",
     roleLabel: "实现",
     runtime: "pi",
+    requestedPool: "dsf",
     poolId: "dsf",
     model: "mcgrox/deepseek-v4.1-flash",
+    channel: "mcgrox",
+    modelName: "deepseek-v4.1-flash",
     status: "queued",
     failReason: null,
     errorMessage: null,
@@ -33,6 +37,7 @@ function fakeWorker(overrides: Partial<WorkerSummary> = {}): WorkerSummary {
     retry: null,
     verdict: null,
     usage: ZERO_USAGE,
+    runMs: 0,
     queuePosition: 1,
     ...overrides,
   };
@@ -47,7 +52,7 @@ afterEach(async () => {
 
 describe("runRunCommand", () => {
   it("派活成功：请求路径、令牌、请求体都对，输出编号和状态行，退出码 0", async () => {
-    const worker = fakeWorker();
+    const worker = fakeWorker({ status: "running", startedAt: "2026-09-23T09:56:48.000Z" });
     harness = await createCommandHarness(() => ({ status: 201, body: { worker } }));
 
     const exitCode = await runRunCommand(
@@ -79,7 +84,65 @@ describe("runRunCommand", () => {
     });
 
     expect(harness.deps.stdoutLines[0]).toBe("w7k2mq");
-    expect(harness.deps.stdoutLines[1]).toContain("排队中");
+    expect(harness.deps.stdoutLines[1]).toContain("工作中");
+    expect(harness.deps.stdoutLines[2]).toBe("池：dsf（mcgrox/deepseek-v4.1-flash）");
+  });
+
+  it("不点名池时请求里不发 pool（规格第二版 1）", async () => {
+    const worker = fakeWorker();
+    harness = await createCommandHarness(() => ({ status: 201, body: { worker } }));
+
+    await runRunCommand(["写代码"], harness.deps);
+    const body = JSON.parse(findRequest(harness.stub.requests, "POST", "/api/workers").body);
+    expect("pool" in body).toBe(false);
+  });
+
+  it("点名排队时第三行写池编号和第几位", async () => {
+    const worker = fakeWorker({ status: "queued", queuePosition: 3 });
+    harness = await createCommandHarness(() => ({ status: 201, body: { worker } }));
+
+    await runRunCommand(["写代码", "--pool", "dsf"], harness.deps);
+    expect(harness.deps.stdoutLines[2]).toBe("排队中：dsf 第 3 位");
+  });
+
+  it("公共排队时状态行写公共排队，第三行写等任一池空位", async () => {
+    const worker = fakeWorker({
+      status: "queued",
+      requestedPool: null,
+      poolId: null,
+      model: null,
+      channel: null,
+      modelName: null,
+      queuePosition: 2,
+    });
+    harness = await createCommandHarness(() => ({ status: 201, body: { worker } }));
+
+    await runRunCommand(["写代码"], harness.deps);
+    expect(harness.deps.stdoutLines[1]).toContain("公共排队/实现");
+    expect(harness.deps.stdoutLines[2]).toBe("排队中，等任一池空位（公共排队第 2 位）");
+  });
+
+  it("带 --wait 时不打第三行（后面的等待输出接着讲这个苦工怎么了）", async () => {
+    const queuedWorker = fakeWorker({ status: "queued" });
+    const doneWorker = fakeWorker({
+      status: "completed",
+      startedAt: "2026-09-23T10:00:00.000Z",
+      endedAt: "2026-09-23T10:00:05.000Z",
+      queuePosition: null,
+    });
+    harness = await createCommandHarness((request) => {
+      if (request.method === "POST" && request.path === "/api/workers") {
+        return { status: 201, body: { worker: queuedWorker } };
+      }
+      if (request.path === "/api/wait") {
+        return { status: 200, body: { done: [doneWorker], pending: [], timedOut: false } };
+      }
+      return { status: 200, body: fakeDetail(doneWorker, [fakeRun()]) };
+    });
+
+    await runRunCommand(["写代码", "--wait"], harness.deps);
+    expect(harness.deps.stdoutLines.some((line) => line.startsWith("池："))).toBe(false);
+    expect(harness.deps.stdoutLines.some((line) => line.startsWith("排队中："))).toBe(false);
   });
 
   it("--json 时原样输出接口返回的 worker JSON", async () => {

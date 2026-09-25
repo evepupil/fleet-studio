@@ -40,7 +40,9 @@ export async function runOpenCommand(
 
   const home = resolveHome(values.home, deps.env);
   const daemon = await ensureDaemon(home, deps.env);
-  launch("rundll32", ["url.dll,FileProtocolHandler", daemon.baseUrl]);
-  deps.io.stdout(`已打开 ${daemon.baseUrl}`);
+  // 默认进总览页（规格第二版 4）：看板是哈希路由，地址里的 /#/overview 由浏览器端解析。
+  const url = `${daemon.baseUrl}/#/overview`;
+  launch("rundll32", ["url.dll,FileProtocolHandler", url]);
+  deps.io.stdout(`已打开 ${url}`);
   return EXIT_CODE.ok;
 }

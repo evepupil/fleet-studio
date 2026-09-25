@@ -14,6 +14,10 @@ function fakePool(overrides: Partial<PoolView> = {}): PoolView {
     id: "dsf",
     label: "深度求索 flash",
     model: "mcgrox/deepseek-v4.1-flash",
+    channel: "mcgrox",
+    modelName: "deepseek-v4.1-flash",
+    priority: 1,
+    enabled: true,
     capacity: 10,
     perProjectCap: null,
     running: 0,
@@ -21,6 +25,7 @@ function fakePool(overrides: Partial<PoolView> = {}): PoolView {
     slots: [],
     queuedByProject: [],
     health: { windowMinutes: 10, completed: 0, failed: 0, retrying: 0 },
+    recent: { windowHours: 24, completed: 0, failed: 0, avgRunMs: null },
     usageToday: ZERO_USAGE,
     ...overrides,
   };

@@ -9,7 +9,7 @@ import { createFleetClient } from "../client.js";
 import type { CommandDeps } from "../context.js";
 import { ensureDaemon } from "../daemon/discover.js";
 import { EXIT_CODE } from "../errors.js";
-import { formatStatusLine } from "../format/statusLine.js";
+import { describePlacement, formatStatusLine } from "../format/statusLine.js";
 import { resolveHome } from "../home.js";
 import { resolveProject } from "../project.js";
 import { readPromptBody } from "../prompt.js";
@@ -38,7 +38,7 @@ const RUN_HELP = `用法：fleet run [任务] [选项]
 选项：
   --project <目录>            苦工归属的项目目录，默认按当前目录向上找 .git
   --cwd <目录>                苦工实际干活的目录，默认当前目录
-  --pool <编号>               指定模型池
+  --pool <编号>               点名模型池；不写就按池的优先级自动挑
   --runtime pi|opencode      指定运行时
   --role <编号>               指定角色
   --title <标题>              任务标题
@@ -110,6 +110,14 @@ export async function runRunCommand(argv: readonly string[], deps: CommandDeps):
     // 只在最终结果里出现一份 JSON（见下面两个分支），避免一次调用打印出两段不同形状的 JSON。
     deps.io.stdout(worker.id);
     deps.io.stdout(formatStatusLine(worker, deps.now()));
+    // 第三行说明现在落在哪个池（规格第二版 1）；带 --wait 时不打：下面的等待输出会接着说
+    // 这个苦工后来怎么了，先说一句「排队中」反而容易被当成最终结果。
+    if (values.wait !== true) {
+      const placement = describePlacement(worker);
+      if (placement !== null) {
+        deps.io.stdout(placement);
+      }
+    }
   }
 
   if (values.wait !== true) {

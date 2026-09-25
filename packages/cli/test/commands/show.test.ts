@@ -36,7 +36,8 @@ describe("runShowCommand", () => {
     expect(output).toContain(`项目目录：${detail.projectPath}`);
     expect(output).toContain(`工作目录：${worker.cwd}`);
     expect(output).toContain("角色：实现");
-    expect(output).toContain("运行时与模型：pi ·");
+    expect(output).toContain("运行时：pi");
+    expect(output).toContain("池与模型：dsf · mcgrox/deepseek-v4.1-flash");
     expect(output).toContain("第1次运行");
     expect(output).toContain("用量与费用：");
     expect(output).toContain("【SUMMARY】");
@@ -93,6 +94,24 @@ describe("runShowCommand", () => {
     const lines = harness.deps.stdoutLines;
     const reportIndex = lines.indexOf("最新回报：");
     expect(lines[reportIndex + 1]).toBe("（暂无回报）");
+  });
+
+  it("没分到池时「池与模型」一行写公共排队占位（规格第二版 2）", async () => {
+    const worker = fakeWorker({
+      status: "queued",
+      requestedPool: null,
+      poolId: null,
+      model: null,
+      channel: null,
+      modelName: null,
+      queuePosition: 2,
+    });
+    harness = await createCommandHarness(() => ({ status: 200, body: fakeDetail(worker) }));
+
+    await runShowCommand([worker.id], harness.deps);
+    const lines = harness.deps.stdoutLines;
+    expect(lines.some((line) => line === "池与模型：公共排队（还没分到池）")).toBe(true);
+    expect(lines.some((line) => line.includes("状态：排队中（第2位）"))).toBe(true);
   });
 
   it("--json 原样输出接口返回的 WorkerDetail", async () => {

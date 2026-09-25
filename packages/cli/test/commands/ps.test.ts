@@ -95,6 +95,23 @@ describe("runPsCommand", () => {
     expect(ids).toEqual(["aaaaa2", "aaaaa1", "qqqqq2", "qqqqq1", "wvw634", "w2uevt"]);
   });
 
+  it("没分到池的苦工在池那一列写公共排队（规格第二版 2）", async () => {
+    const worker = fakeWorker({
+      status: "queued",
+      requestedPool: null,
+      poolId: null,
+      model: null,
+      channel: null,
+      modelName: null,
+      queuePosition: 2,
+    });
+    harness = await createCommandHarness(() => ({ status: 200, body: [worker] }));
+
+    await runPsCommand(["--all"], harness.deps);
+    const workerLine = harness.deps.stdoutLines.find((line) => line.includes(worker.id));
+    expect(workerLine).toContain("公共排队");
+  });
+
   it("--json 原样输出接口返回的 JSON 数组", async () => {
     const worker = fakeWorker();
     harness = await createCommandHarness(() => ({ status: 200, body: [worker] }));
