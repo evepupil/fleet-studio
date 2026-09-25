@@ -25,9 +25,21 @@ export interface WorkerRecord {
   /** 角色编号 */
   role: string;
   runtime: RuntimeId;
-  poolId: string;
-  /** 显示用的模型名，例如 mcgrox/deepseek-v4.1-flash */
-  model: string;
+  /**
+   * 主会话点名的池；没点名为 null（按优先级自动挑）。续接时视同点名 poolId。
+   */
+  requestedPool: string | null;
+  /**
+   * 实际所在的池。点名的在派活时就定下；没点名的第一次放行时才定下，之前为 null。
+   * 定下之后不再变（续接沿用）。
+   */
+  poolId: string | null;
+  /** 显示用的模型名，例如 mcgrox/deepseek-v4.1-flash；和 poolId 同时定下，之前为 null */
+  model: string | null;
+  /** 渠道名，例如 mcgrox（pi 的 provider；opencode 取模型名里第一个「/」之前的部分）；和 poolId 同时定下 */
+  channel: string | null;
+  /** 不带渠道的模型名，例如 deepseek-v4.1-flash；统计「按模型」用它；和 poolId 同时定下 */
+  modelName: string | null;
   /** null 表示沿用运行时自己的默认档位 */
   thinking: ThinkingLevel | null;
   /** pi：fleet-<苦工编号>；opencode：首次运行里拿到的会话编号，拿到之前为 null */
@@ -73,6 +85,8 @@ export interface RunRecord {
   exitCode: number | null;
   killedBy: KilledBy;
   usage: Usage;
+  /** 真正在跑的毫秒数（结束时刻 − 开跑时刻），运行结束时写入；没结束或没开跑为 null */
+  runMs: number | null;
   /** 正在自动重试时的信息；不在重试时为 null */
   retry: RetryInfo | null;
   /** 最近一条工具调用的摘要，例如「bash · pnpm test」 */

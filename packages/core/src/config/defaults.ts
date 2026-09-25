@@ -1,4 +1,4 @@
-import type { FleetConfigInput } from "./schema.js";
+import { DEFAULT_RAW_OUTPUT_RETENTION_DAYS, type FleetConfigInput } from "./schema.js";
 
 /**
  * 角色提示词路径里的 builtin: 前缀，指向 fleet-studio 仓库根目录（区别于 ~ 指向的用户目录）。
@@ -22,14 +22,14 @@ const READONLY_NO_NETWORK_TOOLS = [
 /**
  * 首次启动时写进 config.json 的默认配置。
  * 池选用 DeepSeek V4.1 Flash（走 mcgrox 通道）；角色覆盖 fleet-build / pi-fleet 常见的分工。
+ * 第二版起不写已废弃的 retentionDays / defaults.pool，池也不写 enabled（默认就是启用）。
  */
 export const DEFAULT_CONFIG: FleetConfigInput = {
   version: 1,
   port: 4870,
-  retentionDays: 7,
+  rawOutputRetentionDays: DEFAULT_RAW_OUTPUT_RETENTION_DAYS,
   snapshotWindowHours: 24,
   defaults: {
-    pool: "dsf",
     runtime: "pi",
     role: "worker",
     runTimeoutMin: 30,

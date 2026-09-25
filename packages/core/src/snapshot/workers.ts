@@ -28,13 +28,15 @@ export function resolveRoleLabel(roles: readonly RoleConfig[], roleId: string): 
 
 /**
  * 苦工摘要：看板列表和容量条悬浮详情都用它。
- * `runs` 必须是这个苦工的全部运行（累加用量要用到历史运行）。
+ * `runs` 必须是这个苦工的全部运行（累加用量和 runMs 都要用到历史运行）。
+ * `nowMs` 只用来给"还在跑（或 runMs 缺失）"的那次运行补上已经跑过的时间。
  */
 export function buildWorkerSummary(
   worker: WorkerRecord,
   runs: readonly RunRecord[],
   config: FleetConfig,
   queuePositions: ReadonlyMap<string, number>,
+  nowMs: number,
 ): WorkerSummary {
   const latest = findLatestRun(worker, runs);
   const status: RunStatus = latest?.status ?? "queued";
@@ -49,8 +51,11 @@ export function buildWorkerSummary(
     role: worker.role,
     roleLabel: resolveRoleLabel(config.roles, worker.role),
     runtime: worker.runtime,
+    requestedPool: worker.requestedPool,
     poolId: worker.poolId,
     model: worker.model,
+    channel: worker.channel,
+    modelName: worker.modelName,
     status,
     failReason: latest?.failReason ?? null,
     errorMessage: latest?.errorMessage ?? null,
@@ -65,9 +70,31 @@ export function buildWorkerSummary(
     retry: latest?.retry ?? null,
     verdict: latest?.finalText ? (parseReport(latest.finalText)?.verdict ?? null) : null,
     usage,
+    runMs: sumRunMs(runs, nowMs),
     // 排队位置按运行编号从调用方给的 Map 里查；没有真实运行（兜底场景）时没有编号可查，只能是 null。
     queuePosition: status === "queued" && latest ? (queuePositions.get(latest.id) ?? null) : null,
   };
+}
+
+/**
+ * 各次运行真正在跑的毫秒数之和。
+ * 运行结束时记录过 runMs 就直接用它；runMs 为 null 但已经开跑的（正在跑，或结束数据缺失）
+ * 按 `(endedAt ?? now) − startedAt` 补算，两者都不全的这次运行不计入。
+ */
+function sumRunMs(runs: readonly RunRecord[], nowMs: number): number {
+  let total = 0;
+  for (const run of runs) {
+    if (run.runMs !== null) {
+      total += run.runMs;
+      continue;
+    }
+    if (run.startedAt === null) {
+      continue;
+    }
+    const endMs = run.endedAt === null ? nowMs : Date.parse(run.endedAt);
+    total += Math.max(0, endMs - Date.parse(run.startedAt));
+  }
+  return total;
 }
 
 /** 运行视图：字段基本照抄 RunRecord，额外把最后一条模型文字解析成结构化回报。 */
@@ -96,8 +123,9 @@ export function buildWorkerDetail(
   project: ProjectRecord,
   config: FleetConfig,
   queuePositions: ReadonlyMap<string, number>,
+  nowMs: number,
 ): WorkerDetail {
-  const summary = buildWorkerSummary(worker, runs, config, queuePositions);
+  const summary = buildWorkerSummary(worker, runs, config, queuePositions, nowMs);
   // 排序前先拷贝一份：sort 会原地修改数组，不能动调用方传进来的 runs。
   const orderedRuns = [...runs].sort((a, b) => a.seq - b.seq);
 

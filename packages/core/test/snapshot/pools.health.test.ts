@@ -139,6 +139,7 @@ describe("buildPoolViews：健康窗口 / 今日用量", () => {
     expect(fast.slots).toEqual([]);
     expect(fast.queuedByProject).toEqual([]);
     expect(fast.health).toEqual({ windowMinutes: 10, completed: 0, failed: 0, retrying: 0 });
+    expect(fast.recent).toEqual({ windowHours: 24, completed: 0, failed: 0, avgRunMs: null });
     expect(fast.usageToday).toEqual({ ...ZERO_USAGE });
   });
 });

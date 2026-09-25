@@ -27,7 +27,7 @@ describe("parseConfig", () => {
       return;
     }
     expect(result.config.port).toBe(4870);
-    expect(result.config.retentionDays).toBe(7);
+    expect(result.config.rawOutputRetentionDays).toBe(7);
     expect(result.config.snapshotWindowHours).toBe(24);
     expect(result.config.defaults.runtime).toBe("pi");
     expect(result.config.defaults.role).toBe("worker");
@@ -35,11 +35,64 @@ describe("parseConfig", () => {
     const pool = result.config.pools[0];
     expect(pool?.perProjectCap).toBeNull();
     expect(pool?.runTimeoutMin).toBeNull();
+    expect(pool?.enabled).toBe(true);
     const role = result.config.roles[0];
     expect(role?.description).toBe("");
     expect(role?.pi).toEqual({});
     expect(role?.opencode).toEqual({});
     expect(result.config.runtimes).toEqual({ pi: { command: null }, opencode: { command: null } });
+  });
+
+  it("已废弃的 retentionDays 映射到 rawOutputRetentionDays", () => {
+    const result = parseConfig({
+      version: 1,
+      defaults: {},
+      retentionDays: 3,
+      pools: [
+        { id: "dsf", label: "池", capacity: 10, runtimes: { pi: { provider: "p", model: "m" } } },
+      ],
+      roles: [{ id: "worker", label: "工人" }],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.config.rawOutputRetentionDays).toBe(3);
+    expect(result.config).not.toHaveProperty("retentionDays");
+  });
+
+  it("两个保留期都写时新名字优先", () => {
+    const result = parseConfig({
+      version: 1,
+      defaults: {},
+      retentionDays: 3,
+      rawOutputRetentionDays: 11,
+      pools: [
+        { id: "dsf", label: "池", capacity: 10, runtimes: { pi: { provider: "p", model: "m" } } },
+      ],
+      roles: [{ id: "worker", label: "工人" }],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.config.rawOutputRetentionDays).toBe(11);
+  });
+
+  it("两个保留期都没写时取 7", () => {
+    const result = parseConfig({
+      version: 1,
+      defaults: {},
+      pools: [
+        { id: "dsf", label: "池", capacity: 10, runtimes: { pi: { provider: "p", model: "m" } } },
+      ],
+      roles: [{ id: "worker", label: "工人" }],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.config.rawOutputRetentionDays).toBe(7);
   });
 
   it("根节点类型不对时报根路径 (根)", () => {
@@ -51,7 +104,7 @@ describe("parseConfig", () => {
     expect(result.issues.some((issue) => issue.startsWith("(根):"))).toBe(true);
   });
 
-  it("默认池不存在时报出带路径的问题", () => {
+  it("defaults.pool 写了不存在的池也能通过（已废弃、不再校验）", () => {
     const result = parseConfig({
       version: 1,
       defaults: { pool: "missing" },
@@ -60,11 +113,29 @@ describe("parseConfig", () => {
       ],
       roles: [{ id: "worker", label: "工人" }],
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) {
+    expect(result.ok).toBe(true);
+  });
+
+  it("池写 enabled: false 时保留 false", () => {
+    const result = parseConfig({
+      version: 1,
+      defaults: {},
+      pools: [
+        {
+          id: "dsf",
+          label: "池",
+          capacity: 10,
+          enabled: false,
+          runtimes: { pi: { provider: "p", model: "m" } },
+        },
+      ],
+      roles: [{ id: "worker", label: "工人" }],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
       return;
     }
-    expect(result.issues).toContain("defaults.pool: 默认池不存在：missing");
+    expect(result.config.pools[0]?.enabled).toBe(false);
   });
 
   it("默认角色不存在时报出带路径的问题", () => {

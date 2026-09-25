@@ -3,6 +3,7 @@ import type { FleetConfig } from "../config/schema.js";
 import type { ProjectRecord, RunRecord, WorkerRecord } from "../domain/records.js";
 import { isTerminalStatus } from "../domain/status.js";
 import { SNAPSHOT_WORKER_LIMIT } from "./constants.js";
+import { buildLiveTotals, countSharedQueued } from "./live.js";
 import { buildPoolViews } from "./pools.js";
 import { buildProjectViews } from "./projects.js";
 import { buildWorkerSummary, findLatestRun } from "./workers.js";
@@ -29,6 +30,7 @@ export interface SnapshotInput {
  * 因为容量占用和用量统计要反映真实状态；300 条上限只裁剪苦工列表本身的展示范围。
  */
 export function buildSnapshot(input: SnapshotInput): Snapshot {
+  const nowMs = Date.parse(input.now);
   const runsByWorkerId = groupRunsByWorkerId(input.runs);
   const selectedWorkers = selectSnapshotWorkers(
     input.workers,
@@ -42,6 +44,7 @@ export function buildSnapshot(input: SnapshotInput): Snapshot {
       runsByWorkerId.get(worker.id) ?? [],
       input.config,
       input.queuePositions,
+      nowMs,
     ),
   );
 
@@ -68,10 +71,14 @@ export function buildSnapshot(input: SnapshotInput): Snapshot {
     description: role.description,
   }));
 
+  const workerById = new Map(input.workers.map((worker) => [worker.id, worker] as const));
+
   return {
     version: input.version,
     serverTime: input.now,
     pools,
+    sharedQueued: countSharedQueued(input.runs, workerById),
+    live: buildLiveTotals(input.workers, runsByWorkerId, pools),
     projects,
     workers,
     roles,

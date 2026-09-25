@@ -11,3 +11,4 @@ export * from "./report/index.js";
 export * from "./runtimes/index.js";
 export * from "./scheduling/index.js";
 export * from "./snapshot/index.js";
+export * from "./stats/index.js";

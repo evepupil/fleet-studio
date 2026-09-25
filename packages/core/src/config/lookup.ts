@@ -1,5 +1,6 @@
 import type { PoolPatch } from "../api/requests.js";
 import { FleetError } from "../domain/errors.js";
+import type { RuntimeId } from "../domain/status.js";
 import { BUILTIN_PREFIX } from "./defaults.js";
 import type {
   FleetConfig,
@@ -14,6 +15,50 @@ const MS_PER_MINUTE = 60_000;
 /** 按编号找池；找不到返回 null。 */
 export function findPool(config: FleetConfig, id: string): PoolConfig | null {
   return config.pools.find((pool) => pool.id === id) ?? null;
+}
+
+/** 这个池配了哪些运行时的模型（顺序固定：pi 在前）。 */
+export function poolRuntimes(pool: PoolConfig): RuntimeId[] {
+  const runtimes: RuntimeId[] = [];
+  if (pool.runtimes.pi !== undefined) runtimes.push("pi");
+  if (pool.runtimes.opencode !== undefined) runtimes.push("opencode");
+  return runtimes;
+}
+
+/** 池在某个运行时下的渠道、模型名和显示名 */
+export interface PoolChannelModel {
+  /** 例如 mcgrox */
+  channel: string;
+  /** 例如 deepseek-v4.1-flash */
+  modelName: string;
+  /** 例如 mcgrox/deepseek-v4.1-flash，和第一版苦工记录里的 model 同一写法 */
+  display: string;
+}
+
+/**
+ * 池在指定运行时下的渠道和模型；runtime 省略时按 pi 优先、其次 opencode（和看板显示一致）。
+ * pi：渠道 = provider，模型 = model。
+ * opencode：模型写成「渠道/模型」时按第一个「/」拆开；没有「/」时渠道取池编号。
+ * 池没配这个运行时返回 null。
+ */
+export function poolChannelModel(pool: PoolConfig, runtime?: RuntimeId): PoolChannelModel | null {
+  const pi = pool.runtimes.pi;
+  const opencode = pool.runtimes.opencode;
+  const wantPi = runtime === "pi" || (runtime === undefined && pi !== undefined);
+  if (wantPi) {
+    if (pi === undefined) return null;
+    return { channel: pi.provider, modelName: pi.model, display: `${pi.provider}/${pi.model}` };
+  }
+  if (opencode === undefined) return null;
+  const slash = opencode.model.indexOf("/");
+  if (slash <= 0 || slash === opencode.model.length - 1) {
+    return { channel: pool.id, modelName: opencode.model, display: opencode.model };
+  }
+  return {
+    channel: opencode.model.slice(0, slash),
+    modelName: opencode.model.slice(slash + 1),
+    display: opencode.model,
+  };
 }
 
 /** 按编号找角色；找不到返回 null。 */

@@ -3,12 +3,13 @@ import type { PoolConfig, RoleConfig } from "../config/schema.js";
 import type { RunRecord, WorkerRecord } from "../domain/records.js";
 import { addUsage, ZERO_USAGE } from "../domain/usage.js";
 import { HEALTH_WINDOW_MINUTES } from "./constants.js";
-import { poolDisplayModel } from "./poolModel.js";
+import { poolModelInfo } from "./poolModel.js";
+import { buildPoolRecent, isEndedWithinWindow } from "./poolRecent.js";
 import { resolveRoleLabel } from "./workers.js";
 
 /**
  * 池视图特意使用全部输入的 workers / runs（不是快照里裁剪到 300 条的苦工列表），
- * 因为容量占用、健康窗口、今日用量都要反映真实状态，300 条上限只是苦工列表本身的展示上限。
+ * 因为容量占用、健康窗口、最近战绩、今日用量都要反映真实状态，300 条上限只是苦工列表本身的展示上限。
  */
 export function buildPoolViews(
   pools: readonly PoolConfig[],
@@ -23,13 +24,15 @@ export function buildPoolViews(
   const dayStartMs = Date.parse(dayStart);
   const windowStartMs = nowMs - HEALTH_WINDOW_MINUTES * 60_000;
 
-  return pools.map((pool) =>
-    buildPoolView(pool, runs, workerById, roles, nowMs, windowStartMs, dayStartMs),
+  // 池在配置里的先后就是派活优先级，priority 从 1 开始，方便看板直接显示。
+  return pools.map((pool, index) =>
+    buildPoolView(pool, index + 1, runs, workerById, roles, nowMs, windowStartMs, dayStartMs),
   );
 }
 
 function buildPoolView(
   pool: PoolConfig,
+  priority: number,
   runs: readonly RunRecord[],
   workerById: ReadonlyMap<string, WorkerRecord>,
   roles: readonly RoleConfig[],
@@ -37,6 +40,8 @@ function buildPoolView(
   windowStartMs: number,
   dayStartMs: number,
 ): PoolView {
+  // 只认苦工的 poolId：没点名、还没被放行过的苦工 poolId 为 null，
+  // 它们属于公共排队，不能算进任何一个池（见 Snapshot.sharedQueued）。
   const poolRuns = runs.filter((run) => workerById.get(run.workerId)?.poolId === pool.id);
   const runningRuns = poolRuns.filter((run) => run.status === "running");
   const queuedRuns = poolRuns.filter((run) => run.status === "queued");
@@ -60,10 +65,16 @@ function buildPoolView(
     .filter((run) => run.startedAt !== null && Date.parse(run.startedAt) >= dayStartMs)
     .reduce((sum, run) => addUsage(sum, run.usage), { ...ZERO_USAGE });
 
+  const modelInfo = poolModelInfo(pool);
+
   return {
     id: pool.id,
     label: pool.label,
-    model: poolDisplayModel(pool),
+    model: modelInfo.display,
+    channel: modelInfo.channel,
+    modelName: modelInfo.modelName,
+    priority,
+    enabled: pool.enabled,
     capacity: pool.capacity,
     perProjectCap: pool.perProjectCap,
     running: runningRuns.length,
@@ -71,21 +82,9 @@ function buildPoolView(
     slots,
     queuedByProject,
     health: { windowMinutes: HEALTH_WINDOW_MINUTES, completed, failed, retrying },
+    recent: buildPoolRecent(poolRuns, nowMs),
     usageToday,
   };
-}
-
-/** (now − 窗口, now] 之内结束，恰好等于窗口起点的不算。 */
-function isEndedWithinWindow(
-  endedAt: string | null,
-  windowStartMs: number,
-  nowMs: number,
-): boolean {
-  if (endedAt === null) {
-    return false;
-  }
-  const endedAtMs = Date.parse(endedAt);
-  return endedAtMs > windowStartMs && endedAtMs <= nowMs;
 }
 
 interface SlotGroup {

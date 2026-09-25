@@ -17,10 +17,12 @@ describe("DEFAULT_CONFIG", () => {
   it("顶层字段和规格一致", () => {
     expect(DEFAULT_CONFIG.version).toBe(1);
     expect(DEFAULT_CONFIG.port).toBe(4870);
-    expect(DEFAULT_CONFIG.retentionDays).toBe(7);
+    expect(DEFAULT_CONFIG.rawOutputRetentionDays).toBe(7);
     expect(DEFAULT_CONFIG.snapshotWindowHours).toBe(24);
+    // 已废弃的两个旧字段不再写进默认配置
+    expect(DEFAULT_CONFIG).not.toHaveProperty("retentionDays");
+    expect(DEFAULT_CONFIG.defaults).not.toHaveProperty("pool");
     expect(DEFAULT_CONFIG.defaults).toEqual({
-      pool: "dsf",
       runtime: "pi",
       role: "worker",
       runTimeoutMin: 30,
@@ -43,6 +45,10 @@ describe("DEFAULT_CONFIG", () => {
         opencode: { model: "mcgrox/deepseek-v4.1-flash" },
       },
     });
+  });
+
+  it("默认池不写 enabled，默认就是启用", () => {
+    expect(DEFAULT_CONFIG.pools[0]).not.toHaveProperty("enabled");
   });
 
   it("六个角色编号齐全，顺序和规格表一致", () => {

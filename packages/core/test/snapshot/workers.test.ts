@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { buildRunView, buildWorkerDetail, buildWorkerSummary } from "../../src/snapshot/workers.js";
 import { baseConfig, makeProject, makeRun, makeUsage, makeWorker } from "./fixtures.js";
 
+/** 摘要测试里统一的"现在"：runMs 的兜底计算要拿它当终点。 */
+const NOW_MS = Date.parse("2026-09-23T10:00:00.000Z");
+
 describe("buildWorkerSummary", () => {
   it("按 latestRunSeq 精确匹配最新运行，即便存在序号更大的运行", () => {
     const worker = makeWorker({ latestRunSeq: 2 });
@@ -11,7 +14,7 @@ describe("buildWorkerSummary", () => {
       makeRun({ id: "w00001.3", seq: 3, status: "queued" }),
     ];
 
-    const summary = buildWorkerSummary(worker, runs, baseConfig(), new Map());
+    const summary = buildWorkerSummary(worker, runs, baseConfig(), new Map(), NOW_MS);
 
     expect(summary.status).toBe("running");
     expect(summary.runSeq).toBe(2);
@@ -24,7 +27,7 @@ describe("buildWorkerSummary", () => {
       makeRun({ id: "w00001.3", seq: 3, status: "failed", failReason: "model_error" }),
     ];
 
-    const summary = buildWorkerSummary(worker, runs, baseConfig(), new Map());
+    const summary = buildWorkerSummary(worker, runs, baseConfig(), new Map(), NOW_MS);
 
     expect(summary.status).toBe("failed");
     expect(summary.runSeq).toBe(3);
@@ -34,7 +37,7 @@ describe("buildWorkerSummary", () => {
   it("一次运行都没有时按排队中处理，时间字段取 worker.createdAt", () => {
     const worker = makeWorker({ createdAt: "2026-09-23T05:00:00.000Z", latestRunSeq: 1 });
 
-    const summary = buildWorkerSummary(worker, [], baseConfig(), new Map());
+    const summary = buildWorkerSummary(worker, [], baseConfig(), new Map(), NOW_MS);
 
     expect(summary.status).toBe("queued");
     expect(summary.queuedAt).toBe("2026-09-23T05:00:00.000Z");
@@ -43,6 +46,7 @@ describe("buildWorkerSummary", () => {
     expect(summary.runSeq).toBe(1);
     expect(summary.queuePosition).toBeNull();
     expect(summary.usage).toEqual(makeUsage());
+    expect(summary.runMs).toBe(0);
   });
 
   it("用量按全部运行累加，费用只要有一方已知就按已知的加", () => {
@@ -62,7 +66,7 @@ describe("buildWorkerSummary", () => {
       }),
     ];
 
-    const summary = buildWorkerSummary(worker, runs, baseConfig(), new Map());
+    const summary = buildWorkerSummary(worker, runs, baseConfig(), new Map(), NOW_MS);
 
     expect(summary.usage).toEqual(
       makeUsage({ inputTokens: 110, outputTokens: 55, totalTokens: 165, costUsd: 1.5 }),
@@ -71,8 +75,14 @@ describe("buildWorkerSummary", () => {
 
   it("角色名取配置里的 label，找不到角色时退回角色编号本身", () => {
     const config = baseConfig();
-    const known = buildWorkerSummary(makeWorker({ role: "worker" }), [], config, new Map());
-    const unknown = buildWorkerSummary(makeWorker({ role: "ghost-role" }), [], config, new Map());
+    const known = buildWorkerSummary(makeWorker({ role: "worker" }), [], config, new Map(), NOW_MS);
+    const unknown = buildWorkerSummary(
+      makeWorker({ role: "ghost-role" }),
+      [],
+      config,
+      new Map(),
+      NOW_MS,
+    );
 
     expect(known.roleLabel).toBe("实现");
     expect(unknown.roleLabel).toBe("ghost-role");
@@ -83,11 +93,23 @@ describe("buildWorkerSummary", () => {
     const queuedRun = makeRun({ id: "w00001.1", seq: 1, status: "queued", startedAt: null });
     const queuePositions = new Map([["w00001.1", 3]]);
 
-    const queuedSummary = buildWorkerSummary(worker, [queuedRun], baseConfig(), queuePositions);
+    const queuedSummary = buildWorkerSummary(
+      worker,
+      [queuedRun],
+      baseConfig(),
+      queuePositions,
+      NOW_MS,
+    );
     expect(queuedSummary.queuePosition).toBe(3);
 
     const runningRun = makeRun({ id: "w00001.1", seq: 1, status: "running" });
-    const runningSummary = buildWorkerSummary(worker, [runningRun], baseConfig(), queuePositions);
+    const runningSummary = buildWorkerSummary(
+      worker,
+      [runningRun],
+      baseConfig(),
+      queuePositions,
+      NOW_MS,
+    );
     expect(runningSummary.queuePosition).toBeNull();
   });
 
@@ -95,7 +117,7 @@ describe("buildWorkerSummary", () => {
     const worker = makeWorker({ latestRunSeq: 1 });
     const run = makeRun({ id: "w00001.1", seq: 1, status: "queued", startedAt: null });
 
-    const summary = buildWorkerSummary(worker, [run], baseConfig(), new Map());
+    const summary = buildWorkerSummary(worker, [run], baseConfig(), new Map(), NOW_MS);
 
     expect(summary.queuePosition).toBeNull();
   });
@@ -107,23 +129,90 @@ describe("buildWorkerSummary", () => {
       [makeRun({ id: "w00001.1", seq: 1, status: "completed", finalText: "SELF_REPORT: pass" })],
       baseConfig(),
       new Map(),
+      NOW_MS,
     );
     const withoutFinalText = buildWorkerSummary(
       worker,
       [makeRun({ id: "w00001.1", seq: 1, status: "completed", finalText: null })],
       baseConfig(),
       new Map(),
+      NOW_MS,
     );
     const unparsableFinalText = buildWorkerSummary(
       worker,
       [makeRun({ id: "w00001.1", seq: 1, status: "completed", finalText: "没有任何段头的闲聊" })],
       baseConfig(),
       new Map(),
+      NOW_MS,
     );
 
     expect(withVerdict.verdict).toBe("pass");
     expect(withoutFinalText.verdict).toBeNull();
     expect(unparsableFinalText.verdict).toBeNull();
+  });
+
+  it("新字段直接取自苦工记录；没点名还没放行的苦工 poolId / model / channel / modelName 为 null", () => {
+    const worker = makeWorker({
+      requestedPool: null,
+      poolId: null,
+      model: null,
+      channel: null,
+      modelName: null,
+    });
+
+    const summary = buildWorkerSummary(worker, [], baseConfig(), new Map(), NOW_MS);
+
+    expect(summary.requestedPool).toBeNull();
+    expect(summary.poolId).toBeNull();
+    expect(summary.model).toBeNull();
+    expect(summary.channel).toBeNull();
+    expect(summary.modelName).toBeNull();
+  });
+
+  it("runMs 累加各次运行；runMs 为 null 但已开跑的按 (endedAt ?? now) − startedAt 补", () => {
+    const worker = makeWorker({ latestRunSeq: 3 });
+    const runs = [
+      // 结束时就记过 runMs，直接用现成的。
+      makeRun({
+        id: "w00001.1",
+        seq: 1,
+        status: "completed",
+        startedAt: "2026-09-23T08:00:00.000Z",
+        endedAt: "2026-09-23T08:30:00.000Z",
+        runMs: 900_000,
+      }),
+      // runMs 缺失但已经结束，按 endedAt − startedAt 补。
+      makeRun({
+        id: "w00001.2",
+        seq: 2,
+        status: "completed",
+        startedAt: "2026-09-23T08:40:00.000Z",
+        endedAt: "2026-09-23T08:50:00.000Z",
+        runMs: null,
+      }),
+      // 还在跑，按 now − startedAt 算。
+      makeRun({
+        id: "w00001.3",
+        seq: 3,
+        status: "running",
+        startedAt: "2026-09-23T09:50:00.000Z",
+        endedAt: null,
+        runMs: null,
+      }),
+      // 还没开跑，不计入。
+      makeRun({
+        id: "w00001.4",
+        seq: 4,
+        status: "queued",
+        startedAt: null,
+        endedAt: null,
+        runMs: null,
+      }),
+    ];
+
+    const summary = buildWorkerSummary(worker, runs, baseConfig(), new Map(), NOW_MS);
+
+    expect(summary.runMs).toBe(900_000 + 600_000 + 600_000);
   });
 });
 
@@ -167,7 +256,7 @@ describe("buildWorkerDetail", () => {
       makeRun({ id: "w00001.1", seq: 1, status: "completed" }),
     ];
 
-    const detail = buildWorkerDetail(worker, runs, project, baseConfig(), new Map());
+    const detail = buildWorkerDetail(worker, runs, project, baseConfig(), new Map(), NOW_MS);
 
     expect(detail.projectPath).toBe("C:/code/demo");
     expect(detail.runs.map((run) => run.seq)).toEqual([1, 2]);

@@ -17,10 +17,26 @@ export const API_PATHS = {
   workerMessages: (id: string) => `/api/workers/${encodeURIComponent(id)}/messages`,
   workerCancel: (id: string) => `/api/workers/${encodeURIComponent(id)}/cancel`,
   pool: (id: string) => `/api/pools/${encodeURIComponent(id)}`,
+  /** PUT：启用或停用一个池 */
+  poolEnabled: (id: string) => `/api/pools/${encodeURIComponent(id)}/enabled`,
+  /** PUT：重排全部池的先后（派活优先级） */
+  poolOrder: "/api/pools/order",
+  /** GET：总览统计 */
+  stats: "/api/stats",
+  /** GET：任务列表（分页） */
+  tasks: "/api/tasks",
+  /** GET：全部项目（任务页的项目筛选用） */
+  projects: "/api/projects",
 } as const;
 
-/** 会改变状态的请求必须带这个请求头，值是 daemon.json 里的令牌 */
+/**
+ * 会改变状态的请求必须带这个请求头，值是 daemon.json 里的令牌（命令行），
+ * 或看板首页里写入的看板令牌（只能调启停池、调顺序两个接口）。
+ */
 export const TOKEN_HEADER = "x-fleet-token";
+
+/** 服务托管看板首页时，把看板令牌写进这个名字的 <meta> 标签的 content 里 */
+export const DASHBOARD_TOKEN_META = "fleet-dashboard-token";
 
 /** SSE 事件名 */
 export const SSE_EVENTS = {

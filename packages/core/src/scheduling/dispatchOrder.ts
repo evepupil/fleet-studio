@@ -48,9 +48,22 @@ function isBetterCandidate(candidate: Candidate, current: Candidate | null): boo
 }
 
 /**
+ * 这个池能接哪些排队：点名它的（续接沿用的原池也算点名），加上没点名的公共排队里
+ * 运行时被这个池支持的。点名了别的池的、或运行时没人支持的，都跟这个池无关。
+ */
+function isCandidateFor(limit: PoolLimit, entry: QueuedEntry): boolean {
+  if (entry.requestedPoolId !== null) {
+    return entry.requestedPoolId === limit.poolId;
+  }
+  return limit.runtimes.includes(entry.runtime);
+}
+
+/**
  * 算出一个池“不考虑还剩几个空位”时的公平放行顺序。
- * 规则见模块设计 3.2：每轮从有排队、且没撞单项目上限的项目里，挑占用最少的那个，
- * 放它的队首；占用打平了比队首排队早的，再打平比项目编号字典序。
+ * 规则见模块设计 3.2 与第二版 3.2：每轮从有排队、且没撞单项目上限的项目里，
+ * 挑占用最少的那个，放它的队首；占用打平了比队首排队早的，再打平比项目编号字典序。
+ * 候选范围是「点名这个池的 + 公共排队里运行时被支持的」；`enabled` 不参与判断，
+ * 它只管「放不放行」，先后顺序照算，看板的排队位置才能照常显示。
  */
 export function dispatchOrder(
   limit: PoolLimit,
@@ -58,7 +71,7 @@ export function dispatchOrder(
   queued: readonly QueuedEntry[],
 ): DispatchOrder {
   const poolRunning = running.filter((entry) => entry.poolId === limit.poolId);
-  const poolQueued = queued.filter((entry) => entry.poolId === limit.poolId);
+  const poolQueued = queued.filter((entry) => isCandidateFor(limit, entry));
 
   // 每个项目自己的排队先排成先来先到的队列，之后每轮只看队首。
   const queues = new Map<string, QueuedEntry[]>();

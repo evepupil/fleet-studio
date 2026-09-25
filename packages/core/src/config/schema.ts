@@ -29,6 +29,11 @@ export const poolConfigSchema = z
     runTimeoutMin: z.number().positive().max(1440).nullable().default(null),
     /** 覆盖全局默认的排队超时（分钟）；null 表示沿用默认 */
     queueTimeoutMin: z.number().positive().max(1440).nullable().default(null),
+    /**
+     * 停用的池不再放行新的运行（在跑的照常跑完）；点名它派活会被拒绝。
+     * 池在 pools 数组里的先后就是派活优先级，没有单独的优先级字段。
+     */
+    enabled: z.boolean().default(true),
     runtimes: z.object({
       pi: piPoolModelSchema.optional(),
       opencode: opencodePoolModelSchema.optional(),
@@ -73,16 +78,25 @@ const runtimeSettingsSchema = z.object({
   command: runtimeCommandSchema,
 });
 
+/** 原始输出默认保留天数 */
+export const DEFAULT_RAW_OUTPUT_RETENTION_DAYS = 7;
+
 export const fleetConfigSchema = z
   .object({
     version: z.literal(1),
     port: z.number().int().min(1024).max(65535).default(4870),
-    /** 已结束的苦工保留几天 */
-    retentionDays: z.number().int().min(1).max(365).default(7),
+    /**
+     * 已废弃：第一版「已结束的苦工保留几天」。第二版起任务记录和时间线永久保留，
+     * 读到这个字段且没写 rawOutputRetentionDays 时，把它当作 rawOutputRetentionDays。
+     */
+    retentionDays: z.number().int().min(1).max(3650).optional(),
+    /** 原始输出（runs/<运行>/ 下的 out.jsonl、err.log、task.md）保留几天，默认 7 */
+    rawOutputRetentionDays: z.number().int().min(1).max(3650).optional(),
     /** 快照里保留最近多少小时内结束的苦工 */
     snapshotWindowHours: z.number().int().min(1).max(168).default(24),
     defaults: z.object({
-      pool: z.string().regex(ID_PATTERN),
+      /** 已废弃：第二版起不点名的派活按池的优先级挑选。读到时忽略，不再校验 */
+      pool: z.string().optional(),
       runtime: z.enum(RUNTIME_IDS).default("pi"),
       role: z.string().regex(ID_PATTERN).default("worker"),
       runTimeoutMin: z.number().positive().max(1440).default(30),
@@ -123,13 +137,6 @@ export const fleetConfigSchema = z
       }
       roleIds.add(role.id);
     });
-    if (!poolIds.has(config.defaults.pool)) {
-      ctx.addIssue({
-        code: "custom",
-        message: `默认池不存在：${config.defaults.pool}`,
-        path: ["defaults", "pool"],
-      });
-    }
     if (!roleIds.has(config.defaults.role)) {
       ctx.addIssue({
         code: "custom",
@@ -137,7 +144,12 @@ export const fleetConfigSchema = z
         path: ["defaults", "role"],
       });
     }
-  });
+  })
+  .transform(({ retentionDays, rawOutputRetentionDays, ...rest }) => ({
+    ...rest,
+    rawOutputRetentionDays:
+      rawOutputRetentionDays ?? retentionDays ?? DEFAULT_RAW_OUTPUT_RETENTION_DAYS,
+  }));
 
 /** 校验并补齐默认值之后的配置 */
 export type FleetConfig = z.output<typeof fleetConfigSchema>;

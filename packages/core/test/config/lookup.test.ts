@@ -7,6 +7,8 @@ import {
   findRole,
   opencodePromptPath,
   type PathEnv,
+  poolChannelModel,
+  poolRuntimes,
   resolveQueueTimeoutMs,
   resolveRunTimeoutMs,
 } from "../../src/config/lookup.js";
@@ -15,6 +17,7 @@ import type {
   FleetConfig,
   OpencodeRoleConfig,
   PiRoleConfig,
+  PoolConfig,
   RoleConfig,
 } from "../../src/config/schema.js";
 import { isFleetError } from "../../src/domain/errors.js";
@@ -51,6 +54,120 @@ describe("findPool / findRole", () => {
   it("找不到时返回 null", () => {
     expect(findPool(config, "missing")).toBeNull();
     expect(findRole(config, "missing")).toBeNull();
+  });
+});
+
+describe("poolRuntimes", () => {
+  function poolFixture(runtimes: PoolConfig["runtimes"]): PoolConfig {
+    return {
+      id: "a",
+      label: "池 A",
+      capacity: 1,
+      perProjectCap: null,
+      runTimeoutMin: null,
+      queueTimeoutMin: null,
+      enabled: true,
+      runtimes,
+    };
+  }
+
+  it("两种运行时都配了时 pi 在前", () => {
+    const pool = poolFixture({
+      pi: { provider: "p", model: "m" },
+      opencode: { model: "c/m" },
+    });
+    expect(poolRuntimes(pool)).toEqual(["pi", "opencode"]);
+  });
+
+  it("只配了 opencode 时只返回 opencode", () => {
+    expect(poolRuntimes(poolFixture({ opencode: { model: "m" } }))).toEqual(["opencode"]);
+  });
+});
+
+describe("poolChannelModel", () => {
+  const config = parseOrThrow({
+    version: 1,
+    defaults: {},
+    pools: [
+      {
+        id: "both",
+        label: "两种都有",
+        capacity: 1,
+        runtimes: {
+          pi: { provider: "mcgrox", model: "deepseek-v4.1-flash" },
+          opencode: { model: "mcgrox/deepseek-v4.1-flash" },
+        },
+      },
+      {
+        id: "pi-only",
+        label: "只有 pi",
+        capacity: 1,
+        runtimes: { pi: { provider: "mcgrox", model: "m" } },
+      },
+      {
+        id: "opencode-slash",
+        label: "opencode 带斜杠",
+        capacity: 1,
+        runtimes: { opencode: { model: "mcgrox/deepseek-v4.1-flash" } },
+      },
+      {
+        id: "opencode-plain",
+        label: "opencode 不带斜杠",
+        capacity: 1,
+        runtimes: { opencode: { model: "deepseek-v4.1-flash" } },
+      },
+    ],
+    roles: [{ id: "worker", label: "工人" }],
+  });
+
+  function poolOf(id: string): PoolConfig {
+    const pool = findPool(config, id);
+    if (!pool) {
+      throw new Error(`测试夹具缺池：${id}`);
+    }
+    return pool;
+  }
+
+  it("pi：渠道取 provider，显示名是 provider/model", () => {
+    expect(poolChannelModel(poolOf("both"), "pi")).toEqual({
+      channel: "mcgrox",
+      modelName: "deepseek-v4.1-flash",
+      display: "mcgrox/deepseek-v4.1-flash",
+    });
+  });
+
+  it("opencode 带斜杠：按第一个斜杠拆开渠道和模型", () => {
+    expect(poolChannelModel(poolOf("both"), "opencode")).toEqual({
+      channel: "mcgrox",
+      modelName: "deepseek-v4.1-flash",
+      display: "mcgrox/deepseek-v4.1-flash",
+    });
+  });
+
+  it("opencode 不带斜杠：渠道取池编号", () => {
+    expect(poolChannelModel(poolOf("opencode-plain"), "opencode")).toEqual({
+      channel: "opencode-plain",
+      modelName: "deepseek-v4.1-flash",
+      display: "deepseek-v4.1-flash",
+    });
+  });
+
+  it("省略 runtime 时 pi 优先", () => {
+    expect(poolChannelModel(poolOf("both"))?.channel).toBe("mcgrox");
+    expect(poolChannelModel(poolOf("both"))?.display).toBe("mcgrox/deepseek-v4.1-flash");
+  });
+
+  it("省略 runtime 且只有 opencode 时用 opencode", () => {
+    expect(poolChannelModel(poolOf("opencode-slash"))).toEqual({
+      channel: "mcgrox",
+      modelName: "deepseek-v4.1-flash",
+      display: "mcgrox/deepseek-v4.1-flash",
+    });
+  });
+
+  it("指定了池没配的运行时返回 null", () => {
+    expect(poolChannelModel(poolOf("pi-only"), "opencode")).toBeNull();
+    expect(poolChannelModel(poolOf("opencode-slash"), "pi")).toBeNull();
   });
 });
 

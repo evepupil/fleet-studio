@@ -1,19 +1,42 @@
 import { describe, expect, it } from "vitest";
+import type { RuntimeId } from "../../src/domain/status.js";
 import type { PoolLimit, QueuedEntry, RunningEntry } from "../../src/scheduling/index.js";
 import { dispatchOrder } from "../../src/scheduling/index.js";
 
 const POOL = "p1";
 
 function limit(overrides: Partial<PoolLimit> = {}): PoolLimit {
-  return { poolId: POOL, capacity: 100, perProjectCap: null, ...overrides };
+  return {
+    poolId: POOL,
+    capacity: 100,
+    perProjectCap: null,
+    enabled: true,
+    runtimes: ["pi", "opencode"],
+    ...overrides,
+  };
 }
 
-function q(runId: string, projectKey: string, queuedAt: string, poolId = POOL): QueuedEntry {
-  return { runId, poolId, projectKey, queuedAt };
+/** 默认点名 POOL、运行时 pi；公共排队传 requestedPoolId: null。 */
+function q(
+  runId: string,
+  projectKey: string,
+  queuedAt: string,
+  overrides: Partial<QueuedEntry> = {},
+): QueuedEntry {
+  return { runId, requestedPoolId: POOL, runtime: "pi", projectKey, queuedAt, ...overrides };
 }
 
 function r(runId: string, projectKey: string, poolId = POOL): RunningEntry {
   return { runId, poolId, projectKey };
+}
+
+function publicQ(
+  runId: string,
+  projectKey: string,
+  queuedAt: string,
+  runtime: RuntimeId = "pi",
+): QueuedEntry {
+  return q(runId, projectKey, queuedAt, { requestedPoolId: null, runtime });
 }
 
 describe("dispatchOrder", () => {
@@ -110,15 +133,43 @@ describe("dispatchOrder", () => {
     expect(result.blocked).toEqual(["a2", "b2", "a3", "b3"]);
   });
 
-  it("其他池的条目被忽略：不影响占用计数也不出现在结果里", () => {
+  it("点名别的池的条目被忽略：不影响占用计数也不出现在结果里", () => {
     const running = [r("other-run", "a", "other-pool")];
     const queued = [
       q("a1", "a", "2026-01-01T00:00:00Z"),
-      q("ghost", "a", "2026-01-01T00:00:00Z", "other-pool"),
+      q("ghost", "a", "2026-01-01T00:00:00Z", { requestedPoolId: "other-pool" }),
     ];
     const result = dispatchOrder(limit(), running, queued);
     expect(result.eligible).toEqual(["a1"]);
     expect(result.blocked).toEqual([]);
+  });
+
+  it("公共排队：运行时被这个池支持的才参与（M5 例子 5）", () => {
+    const piOnly = limit({ poolId: "jia", runtimes: ["pi"] });
+    const queued = [
+      publicQ("oc1", "a", "2026-01-01T00:00:00Z", "opencode"),
+      publicQ("pi1", "a", "2026-01-01T00:00:01Z", "pi"),
+    ];
+    const result = dispatchOrder(piOnly, [], queued);
+    // 甲只配了 pi，opencode 的公共排队跟它无关。
+    expect(result.eligible).toEqual(["pi1"]);
+    expect(result.blocked).toEqual([]);
+  });
+
+  it("公共排队与点名排队一起排序：点名不改变公平规则，只改变候选范围", () => {
+    const queued = [
+      q("named", "a", "2026-01-01T00:00:05Z"),
+      publicQ("shared", "b", "2026-01-01T00:00:00Z"),
+    ];
+    const result = dispatchOrder(limit(), [], queued);
+    // b 占用 0、排队更早，先放；点名只是让 named 出现在这个池的候选里。
+    expect(result.eligible).toEqual(["shared", "named"]);
+  });
+
+  it("enabled 不参与先后顺序：停用的池照样能算出完整顺序", () => {
+    const queued = [q("a1", "a", "2026-01-01T00:00:00Z"), q("b1", "b", "2026-01-01T00:00:01Z")];
+    const result = dispatchOrder(limit({ enabled: false }), [], queued);
+    expect(result.eligible).toEqual(["a1", "b1"]);
   });
 
   it("排序不看容量还剩几个空位：即便池已经满了，也能算出完整的公平顺序", () => {

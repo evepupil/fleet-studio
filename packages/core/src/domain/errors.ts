@@ -6,6 +6,8 @@ export const ERROR_CODES = [
   "forbidden_origin",
   "illegal_transition",
   "config_invalid",
+  /** 点名的池（或续接时原来的池）已停用 */
+  "pool_disabled",
   "runtime_unavailable",
   "internal",
 ] as const;
