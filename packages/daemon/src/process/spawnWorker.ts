@@ -11,6 +11,7 @@ import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { FleetError } from "@fleet/core";
 import type { ProcessExitInfo, SpawnedProcess, SpawnRequest } from "./types.js";
+import { windowsWorkerEnv } from "./windowsWorkerEnv.js";
 
 export async function spawnWorker(request: SpawnRequest): Promise<SpawnedProcess> {
   await ensureCwdIsDirectory(request.cwd);
@@ -28,7 +29,7 @@ export async function spawnWorker(request: SpawnRequest): Promise<SpawnedProcess
   const { command } = request;
   const child = spawn(command.executable, [...command.prefixArgs, ...request.args], {
     cwd: request.cwd,
-    env: request.env,
+    env: windowsWorkerEnv(request.env, command.image),
     detached: true,
     windowsHide: true,
     // stdin 必须是 ignore：pi、opencode 在非 TTY stdin 不给 EOF 时都会永久卡住
