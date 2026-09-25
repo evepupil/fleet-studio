@@ -20,15 +20,23 @@ const POOLS_HELP = `用法：fleet pools [--json]
  * 在 ES2019 之后是稳定排序）。
  */
 function byPriority(pools: readonly PoolView[]): PoolView[] {
-  return [...pools].sort((a, b) => a.priority - b.priority);
+  return [...pools].sort((a, b) => rankOf(a, pools) - rankOf(b, pools));
 }
 
-function poolRow(pool: PoolView): string[] {
+/**
+ * 第一版服务的池视图没有 priority、enabled：命令行先升级、服务还没重启时会遇到。
+ * 这时优先级按接口返回的先后算，启停按启用显示，免得把所有池都显示成「停用」。
+ */
+function rankOf(pool: PoolView, pools: readonly PoolView[]): number {
+  return typeof pool.priority === "number" ? pool.priority : pools.indexOf(pool) + 1;
+}
+
+function poolRow(pool: PoolView, pools: readonly PoolView[]): string[] {
   return [
-    String(pool.priority),
+    String(rankOf(pool, pools)),
     pool.id,
     pool.label,
-    pool.enabled ? "启用" : "停用",
+    pool.enabled === false ? "停用" : "启用",
     `${pool.running}/${pool.capacity}`,
     String(pool.queued),
     pool.perProjectCap !== null ? String(pool.perProjectCap) : "不限",
@@ -69,12 +77,12 @@ export async function runPoolsCommand(argv: readonly string[], deps: CommandDeps
       { header: "单项目上限" },
       { header: "最近10分钟完成/失败/重试中" },
     ],
-    byPriority(pools).map(poolRow),
+    byPriority(pools).map((pool) => poolRow(pool, pools)),
   );
   for (const line of lines) {
     deps.io.stdout(line);
   }
-  if (snapshot.sharedQueued > 0) {
+  if (typeof snapshot.sharedQueued === "number" && snapshot.sharedQueued > 0) {
     deps.io.stdout(`公共排队 ${snapshot.sharedQueued} 个（没点名，等任一池空位）`);
   }
   return EXIT_CODE.ok;
