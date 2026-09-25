@@ -6,13 +6,13 @@ import {
   findLatestRun,
   findPool,
   findRole,
-  getRuntimeAdapter,
   isTerminalStatus,
   normalizeProjectPath,
   oneLine,
   type ProjectRecord,
   pickColorIndex,
   piSessionIdOf,
+  poolChannelModel,
   projectKeyOf,
   projectNameOf,
   type RunRecord,
@@ -38,21 +38,44 @@ export async function submitWorker(
   request: SubmitRequest,
 ): Promise<WorkerSummary> {
   const config = ctx.deps.config.current();
-  const poolId = request.pool ?? config.defaults.pool;
+  const requestedPoolId = request.pool ?? null;
   const roleId = request.role ?? config.defaults.role;
   const runtime = request.runtime ?? config.defaults.runtime;
 
-  const pool = findPool(config, poolId);
-  if (pool === null) {
-    throw new FleetError("invalid_request", `池不存在：${poolId}`);
+  const pool = requestedPoolId === null ? null : findPool(config, requestedPoolId);
+  if (requestedPoolId !== null && pool === null) {
+    throw new FleetError("invalid_request", `池不存在：${requestedPoolId}`);
+  }
+  if (pool !== null && !pool.enabled) {
+    throw new FleetError("pool_disabled", `池 ${pool.id} 已停用，换一个池或不点名`);
   }
   if (findRole(config, roleId) === null) {
     throw new FleetError("invalid_request", `角色不存在：${roleId}`);
   }
-  const displayModel = getRuntimeAdapter(runtime).displayModel(pool);
-  if (displayModel === null) {
-    throw new FleetError("invalid_request", `池 ${poolId} 没有为 ${runtime} 指定模型`);
+  if (
+    pool === null &&
+    !config.pools.some((candidate) => poolChannelModel(candidate, runtime) !== null)
+  ) {
+    throw new FleetError("invalid_request", `没有配置 ${runtime} 模型的池`);
   }
+  const poolModel = pool === null ? null : poolChannelModel(pool, runtime);
+  if (pool !== null && poolModel === null) {
+    throw new FleetError("invalid_request", `池 ${pool.id} 没有为 ${runtime} 指定模型`);
+  }
+  const timeoutMs =
+    pool === null
+      ? (request.timeoutMin ?? config.defaults.runTimeoutMin) * MS_PER_MINUTE
+      : resolveRunTimeoutMs(config, pool, request.timeoutMin);
+  const queueTimeoutMin =
+    request.queueTimeoutMin === undefined
+      ? config.defaults.queueTimeoutMin
+      : request.queueTimeoutMin;
+  const queueTimeoutMs =
+    pool === null
+      ? queueTimeoutMin === null
+        ? null
+        : queueTimeoutMin * MS_PER_MINUTE
+      : resolveQueueTimeoutMs(config, pool, request.queueTimeoutMin);
 
   const projectPath = normalizeProjectPath(request.projectPath, ctx.deps.platform);
   const cwd = normalizeProjectPath(request.cwd, ctx.deps.platform);
@@ -84,8 +107,11 @@ export async function submitWorker(
     title,
     role: roleId,
     runtime,
-    poolId,
-    model: displayModel,
+    requestedPool: requestedPoolId,
+    poolId: requestedPoolId,
+    model: poolModel?.display ?? null,
+    channel: poolModel?.channel ?? null,
+    modelName: poolModel?.modelName ?? null,
     thinking: request.thinking ?? config.defaults.thinking,
     sessionRef: runtimeSessionRef,
     createdAt: now,
@@ -103,14 +129,15 @@ export async function submitWorker(
     queuedAt: now,
     startedAt: null,
     endedAt: null,
-    timeoutMs: resolveRunTimeoutMs(config, pool, request.timeoutMin),
-    queueTimeoutMs: resolveQueueTimeoutMs(config, pool, request.queueTimeoutMin),
+    timeoutMs,
+    queueTimeoutMs,
     pid: null,
     processImage: null,
     spawnedAt: null,
     exitCode: null,
     killedBy: null,
     usage: ZERO_USAGE,
+    runMs: null,
     retry: null,
     activity: null,
     lastActivityAt: null,
@@ -130,7 +157,7 @@ export async function submitWorker(
   ctx.notifyWorker(workerId);
   ctx.requestDispatch();
 
-  return buildWorkerSummary(worker, [run], config, ctx.snapshots.queuePositions());
+  return buildWorkerSummary(worker, [run], config, ctx.snapshots.queuePositions(), nowMs);
 }
 
 /** 续接 send(id, request)：模块设计 3.3。只能对已结束的苦工追加指令，复用同一个会话。 */
@@ -151,12 +178,15 @@ export async function sendToWorker(
   if (!isTerminalStatus(latest.status)) {
     throw new FleetError("conflict", "苦工还在排队或工作中，等它结束后再追加指令");
   }
+  const config = ctx.deps.config.current();
+  const pool = worker.poolId === null ? null : findPool(config, worker.poolId);
+  if (pool !== null && !pool.enabled) {
+    throw new FleetError("pool_disabled", `原来的池 ${pool.id} 已停用，续接要沿用原池`);
+  }
   if (worker.runtime === "opencode" && worker.sessionRef === null) {
     throw new FleetError("conflict", "会话还没建立，无法续接");
   }
 
-  const config = ctx.deps.config.current();
-  const pool = findPool(config, worker.poolId);
   const now = new Date(ctx.now()).toISOString();
   const newSeq = worker.latestRunSeq + 1;
 
@@ -192,6 +222,7 @@ export async function sendToWorker(
     exitCode: null,
     killedBy: null,
     usage: ZERO_USAGE,
+    runMs: null,
     retry: null,
     activity: null,
     lastActivityAt: null,
@@ -209,7 +240,13 @@ export async function sendToWorker(
   ctx.requestDispatch();
 
   const updatedWorker: WorkerRecord = { ...worker, latestRunSeq: newSeq };
-  return buildWorkerSummary(updatedWorker, [...runs, run], config, ctx.snapshots.queuePositions());
+  return buildWorkerSummary(
+    updatedWorker,
+    [...runs, run],
+    config,
+    ctx.snapshots.queuePositions(),
+    ctx.now(),
+  );
 }
 
 async function assertDirectoryExists(cwd: string): Promise<void> {

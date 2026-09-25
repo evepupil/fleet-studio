@@ -1,5 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
+import { DASHBOARD_TOKEN_META } from "@fleet/core";
 import type { Context } from "hono";
 
 const NOT_BUILT_MESSAGE = "看板还没有构建，请在 fleet-studio 目录运行 pnpm build";
@@ -54,6 +55,29 @@ function indexResponseHeaders(): Record<string, string> {
   return { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" };
 }
 
+/** HTML 属性值转义。令牌是十六进制串，本不需要转义；写在这里是防止以后换令牌生成方式时留下注入口子。 */
+function escapeAttribute(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+/**
+ * 把看板令牌写进 index.html 的 <meta> 里，看板前端读出来放进 x-fleet-token 头，
+ * 才能调启停池、调顺序两个写接口。没有 </head> 时插到文件开头，保证令牌一定在页面里。
+ * 单独抽成纯函数方便直接单测。
+ */
+export function injectDashboardToken(html: string, token: string): string {
+  const meta = `<meta name="${DASHBOARD_TOKEN_META}" content="${escapeAttribute(token)}">`;
+  const headEnd = html.indexOf("</head>");
+  if (headEnd < 0) {
+    return meta + html;
+  }
+  return html.slice(0, headEnd) + meta + html.slice(headEnd);
+}
+
 /**
  * 按 webDistDir 计算请求路径对应的真实文件路径；越界（路径里出现 `..`，或者解析后跑出
  * 目录之外，例如 Windows 上带盘符的绝对路径会让 path.resolve 直接无视 root）一律返回 null。
@@ -76,10 +100,17 @@ export function resolveStaticTarget(root: string, pathname: string): string | nu
  * 看板静态文件托管：命中就按扩展名返回；没命中回退单页应用的 index.html；
  * 路径越界一律 404；没有构建产物时提示怎么构建。
  */
-export function createStaticHandler(webDistDir: string): (c: Context) => Promise<Response> {
+export function createStaticHandler(
+  webDistDir: string,
+  dashboardToken: string,
+): (c: Context) => Promise<Response> {
   const root = resolve(webDistDir);
   const indexPath = resolve(root, "index.html");
   const assetsPrefix = resolve(root, "assets") + sep;
+
+  // 只有 index.html 要改写（注入看板令牌），其余静态文件原样返回。
+  const indexBody = (buffer: Buffer): string =>
+    injectDashboardToken(buffer.toString("utf8"), dashboardToken);
 
   return async (c) => {
     const pathname = decodePathname(new URL(c.req.url).pathname);
@@ -95,7 +126,7 @@ export function createStaticHandler(webDistDir: string): (c: Context) => Promise
     const fileBuffer = await readFileIfExists(target);
     if (fileBuffer !== null) {
       if (target === indexPath) {
-        return c.body(new Uint8Array(fileBuffer), 200, indexResponseHeaders());
+        return c.body(indexBody(fileBuffer), 200, indexResponseHeaders());
       }
       const headers: Record<string, string> = { "Content-Type": contentTypeFor(target) };
       if (target.startsWith(assetsPrefix)) {
@@ -106,7 +137,7 @@ export function createStaticHandler(webDistDir: string): (c: Context) => Promise
 
     const indexBuffer = await readFileIfExists(indexPath);
     if (indexBuffer !== null) {
-      return c.body(new Uint8Array(indexBuffer), 200, indexResponseHeaders());
+      return c.body(indexBody(indexBuffer), 200, indexResponseHeaders());
     }
 
     return c.text(NOT_BUILT_MESSAGE, 200);

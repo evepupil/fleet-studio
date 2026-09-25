@@ -171,7 +171,7 @@ describe("createEngine：组装与生命周期（模块设计 3.1）", () => {
 
   it("F6b 回归：过期清理在顶层抛错时不阻止启动，只记日志", async () => {
     harness = await createHarness();
-    harness.repos.runs.listExpiredWorkerIds = () => {
+    harness.repos.runs.listRawPurgeCandidates = () => {
       throw new Error("模拟查库炸了");
     };
 
@@ -180,7 +180,7 @@ describe("createEngine：组装与生命周期（模块设计 3.1）", () => {
     try {
       expect(
         harness.logger.records.some(
-          (record) => record.level === "error" && record.message.includes("过期清理"),
+          (record) => record.level === "error" && record.message.includes("原始输出清理"),
         ),
       ).toBe(true);
     } finally {

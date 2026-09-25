@@ -33,6 +33,65 @@ describe("submitWorker：派活校验与建档（模块设计 3.2）", () => {
     ).rejects.toMatchObject({ code: "invalid_request" });
   });
 
+  it("未点名时进入公共队列，实际派活前不预设池和模型", async () => {
+    engine.ctx.requestDispatch = () => {};
+    const summary = await submitWorker(engine.ctx, { projectPath: cwd, cwd, prompt: "公共任务" });
+    const worker = engine.repos.workers.get(summary.id);
+
+    expect(worker).toMatchObject({
+      requestedPool: null,
+      poolId: null,
+      model: null,
+      channel: null,
+      modelName: null,
+    });
+  });
+
+  it("未点名时要求至少有一个池配置所选运行时的模型", async () => {
+    const config = engine.config.current();
+    engine.config.setConfig({
+      ...config,
+      pools: config.pools.map((pool) => ({ ...pool, runtimes: {} })),
+    });
+
+    await expect(
+      submitWorker(engine.ctx, { projectPath: cwd, cwd, prompt: "公共任务" }),
+    ).rejects.toMatchObject({ code: "invalid_request", message: expect.stringContaining("pi") });
+  });
+
+  it("点名停用池时抛 pool_disabled", async () => {
+    const config = engine.config.current();
+    engine.config.setConfig({
+      ...config,
+      pools: config.pools.map((pool) => ({ ...pool, enabled: false })),
+    });
+
+    await expect(
+      submitWorker(engine.ctx, { projectPath: cwd, cwd, prompt: "指定池任务", pool: "dsf" }),
+    ).rejects.toMatchObject({ code: "pool_disabled" });
+  });
+
+  it("公共队列超时采用全局默认，显式 null 可关闭排队超时", async () => {
+    engine.ctx.requestDispatch = () => {};
+    const config = engine.config.current();
+    const defaultSummary = await submitWorker(engine.ctx, {
+      projectPath: cwd,
+      cwd,
+      prompt: "默认",
+    });
+    const unlimitedSummary = await submitWorker(engine.ctx, {
+      projectPath: cwd,
+      cwd,
+      prompt: "不限时",
+      queueTimeoutMin: null,
+    });
+
+    expect(engine.repos.runs.get(`${defaultSummary.id}.1`)?.queueTimeoutMs).toBe(
+      config.defaults.queueTimeoutMin === null ? null : config.defaults.queueTimeoutMin * 60_000,
+    );
+    expect(engine.repos.runs.get(`${unlimitedSummary.id}.1`)?.queueTimeoutMs).toBeNull();
+  });
+
   it("池没有为选中的运行时指定模型时抛 invalid_request，说明带上池编号和运行时", async () => {
     const config = engine.config.current();
     engine.config.setConfig({
@@ -46,6 +105,7 @@ describe("submitWorker：派活校验与建档（模块设计 3.2）", () => {
           perProjectCap: null,
           runTimeoutMin: null,
           queueTimeoutMin: null,
+          enabled: true,
           runtimes: { opencode: { model: "x" } },
         },
       ],
@@ -228,6 +288,53 @@ describe("sendToWorker：续接（模块设计 3.3）", () => {
       code: "conflict",
       message: expect.stringContaining("会话"),
     });
+  });
+
+  it("续接沿用原池，成功后不改池归属", async () => {
+    const worker = createWorkerRecord({ requestedPool: "dsf", poolId: "dsf" });
+    const run = createRunRecord({ status: "completed", endedAt: worker.createdAt });
+    engine.repos.projects.insert({
+      key: worker.projectKey,
+      path: worker.cwd,
+      name: "demo",
+      colorIndex: 0,
+      createdAt: worker.createdAt,
+    });
+    engine.repos.workers.insert(worker);
+    engine.repos.runs.insert(run);
+
+    const summary = await sendToWorker(engine.ctx, worker.id, { prompt: "继续干" });
+
+    expect(summary.poolId).toBe("dsf");
+    expect(engine.repos.workers.get(worker.id)).toMatchObject({
+      requestedPool: "dsf",
+      poolId: "dsf",
+    });
+    expect(engine.repos.runs.get(`${worker.id}.2`)?.status).toBe("queued");
+  });
+
+  it("原池停用时续接抛 pool_disabled，不迁移到其他池", async () => {
+    const worker = createWorkerRecord({ requestedPool: "dsf", poolId: "dsf" });
+    const run = createRunRecord({ status: "completed", endedAt: worker.createdAt });
+    const config = engine.config.current();
+    engine.config.setConfig({
+      ...config,
+      pools: config.pools.map((pool) => ({ ...pool, enabled: false })),
+    });
+    engine.repos.projects.insert({
+      key: worker.projectKey,
+      path: worker.cwd,
+      name: "demo",
+      colorIndex: 0,
+      createdAt: worker.createdAt,
+    });
+    engine.repos.workers.insert(worker);
+    engine.repos.runs.insert(run);
+
+    await expect(sendToWorker(engine.ctx, worker.id, { prompt: "继续干" })).rejects.toMatchObject({
+      code: "pool_disabled",
+    });
+    expect(engine.repos.runs.get(`${worker.id}.2`)).toBeNull();
   });
 
   it("成功续接：新建第 2 次运行、latestRunSeq 更新为 2", async () => {

@@ -11,12 +11,13 @@ import {
 import { waitFor } from "./support/waitFor.js";
 
 /** 假苦工默认不会自己结束（out/err 文件一直是空的），方便观察某一刻到底放行了几个。 */
-async function submitInto(engine: TestEngine, projectDir: string, title: string) {
+async function submitInto(engine: TestEngine, projectDir: string, title: string, pool?: string) {
   return submitWorker(engine.ctx, {
     projectPath: projectDir,
     cwd: projectDir,
     prompt: title,
     title,
+    ...(pool === undefined ? {} : { pool }),
   });
 }
 
@@ -64,6 +65,55 @@ describe("放行循环：容量占位与公平放行（模块设计 3.4）", () 
     expect(countByStatus(engine, "queued")).toBe(3);
   });
 
+  it("公共排队按池配置顺序派发，并在同一事务后记录模型归属", async () => {
+    const current = engine.config.current();
+    const first = { ...basePoolOf(current), id: "first", label: "first", capacity: 1 };
+    const second = { ...first, id: "second", label: "second" };
+    engine.config.setConfig({ ...current, pools: [first, second] });
+
+    const summaries: Awaited<ReturnType<typeof submitInto>>[] = [];
+    for (let i = 0; i < 3; i++) {
+      summaries.push(await submitInto(engine, projectA, `公共${i}`));
+    }
+    await waitFor(() => runningWithPidCount(engine) === 2);
+    await waitFor(() => engine.repos.runs.get(`${summaries[2]?.id}.1`)?.status === "queued");
+
+    expect(engine.repos.workers.get(summaries[0]?.id ?? "")?.poolId).toBe("first");
+    expect(engine.repos.workers.get(summaries[1]?.id ?? "")?.poolId).toBe("second");
+    expect(engine.repos.workers.get(summaries[2]?.id ?? "")?.poolId).toBeNull();
+    expect(engine.repos.workers.get(summaries[0]?.id ?? "")).toMatchObject({
+      model: "mcgrox/deepseek-v4.1-flash",
+      channel: "mcgrox",
+      modelName: "deepseek-v4.1-flash",
+    });
+  });
+
+  it("停用池不放行公共或点名排队任务，也不把它判成 pool_removed", async () => {
+    const current = engine.config.current();
+    engine.config.setConfig({
+      ...current,
+      pools: current.pools.map((pool) => ({ ...pool, capacity: 0, enabled: true })),
+    });
+    const publicTask = await submitInto(engine, projectA, "公共排队");
+    const namedTask = await submitInto(engine, projectA, "点名排队", "dsf");
+    const disabled = engine.config.current();
+    engine.config.setConfig({
+      ...disabled,
+      pools: disabled.pools.map((pool) => ({ ...pool, enabled: false })),
+    });
+    engine.ctx.requestDispatch();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(engine.repos.runs.get(`${publicTask.id}.1`)?.status).toBe("queued");
+    expect(engine.repos.runs.get(`${namedTask.id}.1`)).toMatchObject({
+      status: "queued",
+      failReason: null,
+    });
+    expect(engine.repos.workers.get(publicTask.id)?.poolId).toBeNull();
+    expect(engine.repos.workers.get(namedTask.id)?.poolId).toBe("dsf");
+    expect(engine.host.spawnedProcesses).toHaveLength(0);
+  });
+
   it("谁占得少谁先补：甲占满容量后，甲腾出一个空位时优先给乙排队中的任务", async () => {
     const aSummaries = [];
     for (let i = 0; i < 3; i++) {
@@ -93,7 +143,7 @@ describe("放行循环：容量占位与公平放行（模块设计 3.4）", () 
       ...zeroCapacity,
       pools: [{ ...basePoolOf(zeroCapacity), capacity: 0 }], // 先把容量清零，保证任务卡在排队中
     });
-    const summary = await submitInto(engine, projectA, "占坑");
+    const summary = await submitInto(engine, projectA, "占坑", "dsf");
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(engine.repos.runs.get(`${summary.id}.1`)?.status).toBe("queued");
 
@@ -118,9 +168,9 @@ describe("放行循环：容量占位与公平放行（模块设计 3.4）", () 
       ...zeroCapacity,
       pools: [{ ...basePoolOf(zeroCapacity), capacity: 0 }], // 保证两个任务都卡在排队中
     });
-    const summaryA = await submitInto(engine, projectA, "甲占坑");
+    const summaryA = await submitInto(engine, projectA, "甲占坑", "dsf");
     engine.advanceNow(10); // 保证 A 的 queuedAt 严格早于 B，放行循环处理顺序才是确定的
-    const summaryB = await submitInto(engine, projectA, "乙占坑");
+    const summaryB = await submitInto(engine, projectA, "乙占坑", "dsf");
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(engine.repos.runs.get(`${summaryA.id}.1`)?.status).toBe("queued");
     expect(engine.repos.runs.get(`${summaryB.id}.1`)?.status).toBe("queued");

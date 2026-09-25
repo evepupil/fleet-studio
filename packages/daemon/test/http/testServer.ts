@@ -11,6 +11,9 @@ import { createFakeService, type FakeService } from "./fakeService.js";
 /** 固定测试令牌，长度和真实令牌接近，够用来测定长比较。 */
 export const TEST_TOKEN = "fleet-test-token-0123456789abcdef";
 
+/** 固定测试看板令牌：只能调启停池、调顺序两个 PUT 路由。 */
+export const TEST_DASHBOARD_TOKEN = "fleet-dashboard-token-0123456789";
+
 /**
  * 解析响应体用于断言。这个项目没有引入 DOM 类型库，fetch() 的 res.json() 被 @types/node
  * 推断成 Promise<unknown>，逐层取字段（例如 body.error.code）会被类型检查拦下来；
@@ -46,10 +49,13 @@ export interface TestServer {
   baseUrl: string;
   port: number;
   token: string;
+  dashboardToken: string;
   service: FakeService;
   webDistDir: string;
   /** 带令牌头发请求的简便封装，改动类接口测试基本都用它。 */
   fetchWithToken(path: string, init?: RequestInit): Promise<Response>;
+  /** 带看板令牌头发请求的简便封装，用来验证看板写权限的边界。 */
+  fetchWithDashboardToken(path: string, init?: RequestInit): Promise<Response>;
   /**
    * 用 node:http 直接发请求：唯一目的是测错误的 Host 头——fetch() 会按 URL 自动改写 Host，
    * 没法伪造成别的值，只有 node:http 的 request 能自己指定原始请求头。
@@ -62,6 +68,7 @@ export interface TestServer {
 export async function startTestServer(webDistDir?: string): Promise<TestServer> {
   const service = createFakeService();
   const token = TEST_TOKEN;
+  const dashboardToken = TEST_DASHBOARD_TOKEN;
   // 没传 webDistDir 时自己建一个临时目录：这份目录只有这次调用自己在用，
   // close() 里必须自己删掉，不然会在系统临时目录里越攒越多（调用方传了目录进来的情况，
   // 目录的生命周期归调用方管，这里不能删）。
@@ -74,6 +81,7 @@ export async function startTestServer(webDistDir?: string): Promise<TestServer> 
   const app = createHttpApp({
     service,
     token,
+    dashboardToken,
     getPort: () => port,
     webDistDir: resolvedWebDistDir,
     logger: createSilentLogger(),
@@ -87,12 +95,18 @@ export async function startTestServer(webDistDir?: string): Promise<TestServer> 
     baseUrl,
     port,
     token,
+    dashboardToken,
     service,
     webDistDir: resolvedWebDistDir,
     fetchWithToken: (path, init = {}) =>
       fetch(`${baseUrl}${path}`, {
         ...init,
         headers: { ...init.headers, "x-fleet-token": token },
+      }),
+    fetchWithDashboardToken: (path, init = {}) =>
+      fetch(`${baseUrl}${path}`, {
+        ...init,
+        headers: { ...init.headers, "x-fleet-token": dashboardToken },
       }),
     rawRequest: (options) => sendRawRequest(port, options),
     close: async () => {

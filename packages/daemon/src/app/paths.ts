@@ -6,13 +6,25 @@
 import { join } from "node:path";
 import type { DaemonPaths } from "./types.js";
 
-export function resolveDaemonPaths(home: string): DaemonPaths {
+/**
+ * 配置文件备份目录（第二版：看板改配置前先留一份原文）。
+ * DaemonPaths 是主控维护的契约，这次不动它的字段，先以独立函数导出；
+ * 之后契约扩字段时可以直接接上。
+ */
+export function configBackupsDir(home: string): string {
+  return join(home, "config-backups");
+}
+
+type DaemonPathsWithDbBackups = DaemonPaths & { dbBackupsDir: string };
+
+export function resolveDaemonPaths(home: string): DaemonPathsWithDbBackups {
   const runsDir = join(home, "runs");
   return {
     home,
     configFile: join(home, "config.json"),
     daemonInfoFile: join(home, "daemon.json"),
     dbFile: join(home, "fleet.db"),
+    dbBackupsDir: join(home, "db-backups"),
     logFile: join(home, "daemon.log"),
     runsDir,
     runDir(runId: string): string {

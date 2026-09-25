@@ -63,6 +63,23 @@ describe("workerRepo", () => {
       expect(updated?.sessionRef).toBe("fleet-w1");
     });
 
+    it("放行后可以更新实际池和模型拆分字段", () => {
+      const { workers } = setup();
+      workers.insert(createWorkerRecord({ id: "w1", projectKey: "p1", poolId: null, model: null }));
+      workers.update("w1", {
+        poolId: "pool-a",
+        model: "provider/model",
+        channel: "provider",
+        modelName: "model",
+      });
+      expect(workers.get("w1")).toMatchObject({
+        poolId: "pool-a",
+        model: "provider/model",
+        channel: "provider",
+        modelName: "model",
+      });
+    });
+
     it("sessionRef 显式传 null 可以清空", () => {
       const { workers } = setup();
       workers.insert(createWorkerRecord({ id: "w1", projectKey: "p1", sessionRef: "fleet-w1" }));

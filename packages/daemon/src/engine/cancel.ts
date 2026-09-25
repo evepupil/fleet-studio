@@ -29,7 +29,7 @@ export async function cancelWorker(ctx: EngineContext, id: string): Promise<Work
   }
 
   if (isTerminalStatus(latest.status)) {
-    return buildWorkerSummary(worker, runs, config, ctx.snapshots.queuePositions());
+    return buildWorkerSummary(worker, runs, config, ctx.snapshots.queuePositions(), ctx.now());
   }
 
   if (latest.status === "queued") {
@@ -66,5 +66,11 @@ export async function cancelWorker(ctx: EngineContext, id: string): Promise<Work
 
   const finalWorker = ctx.deps.repos.workers.get(id) ?? worker;
   const finalRuns = ctx.deps.repos.runs.listByWorker(id);
-  return buildWorkerSummary(finalWorker, finalRuns, config, ctx.snapshots.queuePositions());
+  return buildWorkerSummary(
+    finalWorker,
+    finalRuns,
+    config,
+    ctx.snapshots.queuePositions(),
+    ctx.now(),
+  );
 }

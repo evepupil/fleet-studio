@@ -12,7 +12,7 @@ import {
 import { streamSSE } from "hono/streaming";
 import type { HttpApp, HttpAppDeps } from "../createApp.js";
 import { parseOrThrow } from "../errors.js";
-import { readJsonBody, tokenGuard } from "../guards.js";
+import { readJsonBody, requireCliToken } from "../guards.js";
 import { createTrailingThrottle, sendEvent, startHeartbeat, waitForAbort } from "../sse.js";
 
 /** 单苦工详情节流：距上次发送不到这个间隔就等到满足间隔再发最新详情。 */
@@ -35,7 +35,7 @@ export function registerWorkersRoutes(app: HttpApp, { service, token }: HttpAppD
     return c.json(service.listWorkers(query));
   });
 
-  app.post(API_PATHS.workers, tokenGuard(token), async (c) => {
+  app.post(API_PATHS.workers, requireCliToken(token), async (c) => {
     const body = await readJsonBody(c);
     const request = parseOrThrow(submitRequestSchema.safeParse(body));
     const worker = await service.submit(request);
@@ -60,7 +60,7 @@ export function registerWorkersRoutes(app: HttpApp, { service, token }: HttpAppD
     return c.json(page);
   });
 
-  app.post(`${API_PATHS.workers}/:id/messages`, tokenGuard(token), async (c) => {
+  app.post(`${API_PATHS.workers}/:id/messages`, requireCliToken(token), async (c) => {
     const id = c.req.param("id");
     const body = await readJsonBody(c);
     const request = parseOrThrow(sendRequestSchema.safeParse(body));
@@ -68,7 +68,7 @@ export function registerWorkersRoutes(app: HttpApp, { service, token }: HttpAppD
     return c.json({ worker });
   });
 
-  app.post(`${API_PATHS.workers}/:id/cancel`, tokenGuard(token), async (c) => {
+  app.post(`${API_PATHS.workers}/:id/cancel`, requireCliToken(token), async (c) => {
     const worker = await service.cancel(c.req.param("id"));
     return c.json({ worker });
   });

@@ -1,5 +1,5 @@
 /** 假配置存储：内存里保存一份配置，save/setConfig 都会触发 onChange 监听者。 */
-import type { FleetConfig } from "@fleet/core";
+import { type FleetConfig, FleetError, parseConfig } from "@fleet/core";
 import type { ConfigStore } from "../../../src/app/types.js";
 
 export interface FakeConfigStore extends ConfigStore {
@@ -37,6 +37,16 @@ export function createFakeConfigStore(initial: FleetConfig): FakeConfigStore {
     async save(config: FleetConfig): Promise<void> {
       saveCallCount += 1;
       current = config;
+      error = null;
+      notify();
+    },
+    async updateRaw(edit: (raw: unknown) => unknown): Promise<void> {
+      saveCallCount += 1;
+      const result = parseConfig(edit(current));
+      if (!result.ok) {
+        throw new FleetError("config_invalid", `配置文件有错：${result.issues.join("；")}`);
+      }
+      current = result.config;
       error = null;
       notify();
     },

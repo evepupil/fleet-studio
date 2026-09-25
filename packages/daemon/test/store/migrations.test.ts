@@ -2,188 +2,164 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
-import { openDatabase } from "../../src/store/index.js";
+import {
+  migrateFromVersion,
+  openDatabase,
+  readUserVersion,
+  runMigrations,
+} from "../../src/store/index.js";
+import { seedVersion2Database } from "./legacyDb.js";
 import { createTempDbPath } from "./tempDb.js";
 
-/**
- * 版本 1 的建表语句原文（故意手写一份、不从 migrations.ts 里导出复用）：
- * 用来手工造一个「只跑过版本 1」的文件库，验证升级到版本 2 时旧数据不丢、新列为 null。
- */
-const VERSION_1_SQL = `
-  CREATE TABLE projects (
-    key TEXT PRIMARY KEY,
-    path TEXT NOT NULL,
-    name TEXT NOT NULL,
-    color_index INTEGER NOT NULL,
-    created_at TEXT NOT NULL
-  );
-  CREATE TABLE workers (
-    id TEXT PRIMARY KEY,
-    project_key TEXT NOT NULL REFERENCES projects(key) ON DELETE CASCADE,
-    cwd TEXT NOT NULL,
-    title TEXT NOT NULL,
-    role TEXT NOT NULL,
-    runtime TEXT NOT NULL,
-    pool_id TEXT NOT NULL,
-    model TEXT NOT NULL,
-    thinking TEXT,
-    session_ref TEXT,
-    created_at TEXT NOT NULL,
-    latest_run_seq INTEGER NOT NULL
-  );
-  CREATE TABLE runs (
-    id TEXT PRIMARY KEY,
-    worker_id TEXT NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
-    seq INTEGER NOT NULL,
-    prompt TEXT NOT NULL,
-    status TEXT NOT NULL,
-    fail_reason TEXT,
-    error_message TEXT,
-    queued_at TEXT NOT NULL,
-    started_at TEXT,
-    ended_at TEXT,
-    timeout_ms INTEGER NOT NULL,
-    queue_timeout_ms INTEGER,
-    pid INTEGER,
-    process_image TEXT,
-    exit_code INTEGER,
-    killed_by TEXT,
-    usage_json TEXT NOT NULL,
-    retry_json TEXT,
-    activity TEXT,
-    last_activity_at TEXT,
-    final_text TEXT,
-    event_count INTEGER NOT NULL DEFAULT 0,
-    UNIQUE (worker_id, seq)
-  );
-`;
-
-/** 手工造一个只跑过版本 1 的文件库：建好表、写一条运行、user_version 停在 1。 */
-function seedVersion1Database(dbPath: string): void {
-  const db = new DatabaseSync(dbPath);
-  db.exec(VERSION_1_SQL);
-  db.exec("PRAGMA user_version = 1;");
-  db.prepare(
-    "INSERT INTO projects (key, path, name, color_index, created_at) VALUES (?, ?, ?, ?, ?);",
-  ).run("c:\\code\\old", "C:\\code\\old", "old", 0, "2026-01-01T00:00:00.000Z");
-  db.prepare(
-    `INSERT INTO workers
-       (id, project_key, cwd, title, role, runtime, pool_id, model, thinking, session_ref, created_at, latest_run_seq)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-  ).run(
-    "wold0001",
-    "c:\\code\\old",
-    "C:\\code\\old",
-    "旧任务",
-    "worker",
-    "pi",
-    "dsf",
-    "mcgrox/deepseek-v4.1-flash",
-    null,
-    "fleet-wold0001",
-    "2026-01-01T00:00:00.000Z",
-    1,
-  );
-  db.prepare(
-    `INSERT INTO runs (
-       id, worker_id, seq, prompt, status, fail_reason, error_message,
-       queued_at, started_at, ended_at, timeout_ms, queue_timeout_ms,
-       pid, process_image, exit_code, killed_by, usage_json, retry_json,
-       activity, last_activity_at, final_text, event_count
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-  ).run(
-    "wold0001.1",
-    "wold0001",
-    1,
-    "升级前派的活",
-    "running",
-    null,
-    null,
-    "2026-01-01T00:00:00.000Z",
-    "2026-01-01T00:00:01.000Z",
-    null,
-    1_800_000,
-    null,
-    4321,
-    "node.exe",
-    null,
-    null,
-    '{"inputTokens":0,"outputTokens":0,"cacheReadTokens":0,"cacheWriteTokens":0,"totalTokens":0,"costUsd":null}',
-    null,
-    null,
-    null,
-    null,
-    0,
-  );
-  db.close();
-}
-
 describe("openDatabase / 迁移", () => {
-  it(":memory: 新库建表后 PRAGMA user_version 变成 2", () => {
+  it("新库直接升到版本 3 并建好 M5 表和列", () => {
     const db = openDatabase(":memory:");
-    expect(db.prepare("PRAGMA user_version;").get()).toEqual({ user_version: 2 });
+    expect(readUserVersion(db)).toBe(3);
+    expect(() => db.prepare("SELECT * FROM series_colors;").all()).not.toThrow();
+    expect(() =>
+      db.prepare(`SELECT requested_pool, channel, model_name FROM workers LIMIT 0;`).all(),
+    ).not.toThrow();
+    expect(() =>
+      db
+        .prepare(
+          `SELECT input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
+                total_tokens, cost_usd, run_ms, raw_purged, spawned_at FROM runs LIMIT 0;`,
+        )
+        .all(),
+    ).not.toThrow();
+    expect(db.prepare("PRAGMA foreign_keys;").get()).toEqual({ foreign_keys: 1 });
     db.close();
   });
 
-  it("三张表都建好了，能直接查询，runs 表已经有 spawned_at 列", () => {
-    const db = openDatabase(":memory:");
-    expect(() => db.prepare("SELECT * FROM projects;").all()).not.toThrow();
-    expect(() => db.prepare("SELECT * FROM workers;").all()).not.toThrow();
-    expect(() => db.prepare("SELECT spawned_at FROM runs;").all()).not.toThrow();
-    db.close();
-  });
-
-  it("文件数据库：父目录不存在时先建好", () => {
+  it("版本 2 数据迁移保留记录、拆分模型字段并从 JSON 搬用量", () => {
     const { dbPath, cleanup } = createTempDbPath();
     try {
-      const nestedPath = join(dbPath, "..", "nested", "fleet.db");
-      const db = openDatabase(nestedPath);
-      expect(existsSync(nestedPath)).toBe(true);
+      seedVersion2Database(dbPath);
+      const db = openDatabase(dbPath);
+      expect(readUserVersion(db)).toBe(3);
+      expect(db.prepare("PRAGMA foreign_key_check;").all()).toEqual([]);
+
+      expect(db.prepare("SELECT * FROM workers WHERE id = ?;").get("w-slash")).toMatchObject({
+        requested_pool: null,
+        pool_id: "pool-a",
+        model: "provider/model-v1",
+        channel: "provider",
+        model_name: "model-v1",
+      });
+      expect(db.prepare("SELECT * FROM workers WHERE id = ?;").get("w-plain")).toMatchObject({
+        channel: "pool-b",
+        model_name: "plain-model",
+      });
+      expect(db.prepare("SELECT * FROM runs WHERE id = ?;").get("w-slash.1")).toMatchObject({
+        input_tokens: 10,
+        output_tokens: 20,
+        cache_read_tokens: 3,
+        cache_write_tokens: 4,
+        total_tokens: 37,
+        cost_usd: 0.125,
+        run_ms: 60_000,
+        raw_purged: 0,
+        spawned_at: "2026-01-01T00:00:00.100Z",
+      });
+      expect(db.prepare("SELECT * FROM runs WHERE id = ?;").get("w-plain.1")).toMatchObject({
+        input_tokens: 2,
+        output_tokens: 0,
+        cache_read_tokens: 0,
+        cache_write_tokens: 0,
+        total_tokens: 2,
+        cost_usd: null,
+        run_ms: null,
+      });
       db.close();
     } finally {
       cleanup();
     }
   });
 
-  it("文件数据库：再次打开不重复执行迁移", () => {
+  it("同一个文件库用两个连接先后迁移，拿到过期版本号的第二个连接不重复迁移", () => {
     const { dbPath, cleanup } = createTempDbPath();
     try {
-      const first = openDatabase(dbPath);
+      seedVersion2Database(dbPath);
+
+      const first = new DatabaseSync(dbPath);
+      runMigrations(first);
+      expect(readUserVersion(first)).toBe(3);
       first.close();
 
-      const second = openDatabase(dbPath);
-      expect(second.prepare("PRAGMA user_version;").get()).toEqual({ user_version: 2 });
+      // 第二个连接是照着「还是版本 2」这个过期印象来的（模拟拿到锁前库已被别人迁完），
+      // 重读版本后应该直接跳过，不能拿旧版本号再跑一遍迁移。
+      const second = new DatabaseSync(dbPath);
+      expect(() => migrateFromVersion(second, 2)).not.toThrow();
+      expect(readUserVersion(second)).toBe(3);
+      expect(second.prepare("PRAGMA foreign_key_check;").all()).toEqual([]);
+      // 数据没被重复迁移弄坏：苦工还是两条，运行还在，模型字段拆分仍然正确。
+      expect(second.prepare("SELECT COUNT(*) AS count FROM workers;").get()).toMatchObject({
+        count: 2,
+      });
+      expect(second.prepare("SELECT * FROM runs WHERE id = ?;").get("w-slash.1")).toMatchObject({
+        input_tokens: 10,
+        total_tokens: 37,
+      });
       second.close();
     } finally {
       cleanup();
     }
   });
 
-  it("文件数据库开启 WAL 模式", () => {
+  it("usage_json 不是合法 JSON 时该行用量归零，其余行正常迁移", () => {
     const { dbPath, cleanup } = createTempDbPath();
     try {
+      seedVersion2Database(dbPath, { malformedUsage: true });
       const db = openDatabase(dbPath);
-      expect(db.prepare("PRAGMA journal_mode;").get()).toEqual({ journal_mode: "wal" });
+      expect(readUserVersion(db)).toBe(3);
+      expect(db.prepare("PRAGMA foreign_key_check;").all()).toEqual([]);
+
+      expect(db.prepare("SELECT * FROM runs WHERE id = ?;").get("w-slash.1")).toMatchObject({
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_read_tokens: 0,
+        cache_write_tokens: 0,
+        total_tokens: 0,
+        cost_usd: null,
+        run_ms: 60_000,
+      });
+      expect(db.prepare("SELECT * FROM runs WHERE id = ?;").get("w-plain.1")).toMatchObject({
+        input_tokens: 2,
+        total_tokens: 2,
+      });
       db.close();
     } finally {
       cleanup();
     }
   });
 
-  it("只跑过版本 1 的旧库重新打开后升到版本 2，原有数据不丢，新列为 null", () => {
+  it("外键检查失败时回滚版本 3，并重新开启外键", () => {
     const { dbPath, cleanup } = createTempDbPath();
     try {
-      seedVersion1Database(dbPath);
-
-      const db = openDatabase(dbPath);
-      expect(db.prepare("PRAGMA user_version;").get()).toEqual({ user_version: 2 });
-
-      const project = db.prepare("SELECT * FROM projects WHERE key = ?;").get("c:\\code\\old");
-      expect(project).toMatchObject({ name: "old" });
-
-      const run = db.prepare("SELECT * FROM runs WHERE id = ?;").get("wold0001.1");
-      expect(run).toMatchObject({ prompt: "升级前派的活", pid: 4321, spawned_at: null });
+      seedVersion2Database(dbPath, { orphanWorker: true });
+      const db = new DatabaseSync(dbPath);
+      db.exec("PRAGMA foreign_keys = ON;");
+      expect(() => runMigrations(db)).toThrow("数据库迁移后外键检查失败");
+      expect(readUserVersion(db)).toBe(2);
+      expect(db.prepare("PRAGMA foreign_keys;").get()).toEqual({ foreign_keys: 1 });
+      expect(() => db.prepare("SELECT requested_pool FROM workers;").all()).toThrow();
+      expect(() => db.prepare("SELECT usage_json FROM runs;").all()).not.toThrow();
       db.close();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("文件数据库父目录不存在时会先创建，并且重复打开不重复迁移", () => {
+    const { dbPath, cleanup } = createTempDbPath();
+    try {
+      const nestedPath = join(dbPath, "..", "nested", "fleet.db");
+      const first = openDatabase(nestedPath);
+      expect(existsSync(nestedPath)).toBe(true);
+      first.close();
+      const second = openDatabase(nestedPath);
+      expect(readUserVersion(second)).toBe(3);
+      second.close();
     } finally {
       cleanup();
     }

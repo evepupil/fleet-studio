@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { isTerminalStatus, RUN_STATUSES, type RunRecord, TERMINAL_STATUSES } from "@fleet/core";
-import { mapRunRow, readString, retryToJson, usageToJson } from "./rowMappers.js";
+import { mapRunRow, readString, retryToJson } from "./rowMappers.js";
 import type { RunPatch, RunRepo } from "./types.js";
 
 /** 单条语句最多绑定的编号个数；批量查询超过这个数就分批，避开 SQLite 参数个数上限。 */
@@ -17,16 +17,17 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
 /** 排队中和工作中，即「没结束」的状态；从 RUN_STATUSES 里减去终态得到，不手写字面量。 */
 const ACTIVE_STATUSES = RUN_STATUSES.filter((status) => !isTerminalStatus(status));
 
-/** 运行仓库。usage / retry 两列进出都要经过 rowMappers 的 JSON 编解码，其余列一一对应。 */
+/** 运行仓库。retry_json 经 rowMappers 编解码；结构化用量列分别校验和写入。 */
 export function createRunRepo(db: DatabaseSync): RunRepo {
   const getStmt = db.prepare("SELECT * FROM runs WHERE id = ?;");
   const insertStmt = db.prepare(
     `INSERT INTO runs (
        id, worker_id, seq, prompt, status, fail_reason, error_message,
        queued_at, started_at, ended_at, timeout_ms, queue_timeout_ms,
-       pid, process_image, spawned_at, exit_code, killed_by, usage_json, retry_json,
-       activity, last_activity_at, final_text, event_count
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+       pid, process_image, spawned_at, exit_code, killed_by,
+       input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, total_tokens,
+       cost_usd, run_ms, retry_json, activity, last_activity_at, final_text, event_count
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
   );
   const listByWorkerStmt = db.prepare("SELECT * FROM runs WHERE worker_id = ? ORDER BY seq ASC;");
   const listActiveStmt = db.prepare(
@@ -39,6 +40,15 @@ export function createRunRepo(db: DatabaseSync): RunRepo {
   );
   const listStartedSinceStmt = db.prepare(
     "SELECT * FROM runs WHERE started_at >= ? ORDER BY started_at ASC;",
+  );
+  const listStartedBetweenStmt = db.prepare(
+    "SELECT * FROM runs WHERE started_at >= ? AND started_at < ? ORDER BY started_at ASC;",
+  );
+  const listStartedUntilStmt = db.prepare(
+    "SELECT * FROM runs WHERE started_at IS NOT NULL AND started_at < ? ORDER BY started_at ASC;",
+  );
+  const listRawPurgeCandidatesStmt = db.prepare(
+    "SELECT id FROM runs WHERE raw_purged = 0 AND ended_at < ? ORDER BY ended_at ASC LIMIT ?;",
   );
   const listExpiredWorkerIdsStmt = db.prepare(
     `SELECT workers.id AS worker_id
@@ -73,7 +83,13 @@ export function createRunRepo(db: DatabaseSync): RunRepo {
         run.spawnedAt,
         run.exitCode,
         run.killedBy,
-        usageToJson(run.usage),
+        run.usage.inputTokens,
+        run.usage.outputTokens,
+        run.usage.cacheReadTokens,
+        run.usage.cacheWriteTokens,
+        run.usage.totalTokens,
+        run.usage.costUsd,
+        run.runMs,
         retryToJson(run.retry),
         run.activity,
         run.lastActivityAt,
@@ -135,8 +151,26 @@ export function createRunRepo(db: DatabaseSync): RunRepo {
         values.push(patch.killedBy);
       }
       if (patch.usage !== undefined) {
-        assignments.push("usage_json = ?");
-        values.push(usageToJson(patch.usage));
+        assignments.push(
+          "input_tokens = ?",
+          "output_tokens = ?",
+          "cache_read_tokens = ?",
+          "cache_write_tokens = ?",
+          "total_tokens = ?",
+          "cost_usd = ?",
+        );
+        values.push(
+          patch.usage.inputTokens,
+          patch.usage.outputTokens,
+          patch.usage.cacheReadTokens,
+          patch.usage.cacheWriteTokens,
+          patch.usage.totalTokens,
+          patch.usage.costUsd,
+        );
+      }
+      if (patch.runMs !== undefined) {
+        assignments.push("run_ms = ?");
+        values.push(patch.runMs);
       }
       if (patch.retry !== undefined) {
         assignments.push("retry_json = ?");
@@ -204,6 +238,30 @@ export function createRunRepo(db: DatabaseSync): RunRepo {
 
     listStartedSince(since: string): RunRecord[] {
       return listStartedSinceStmt.all(since).map(mapRunRow);
+    },
+
+    listStartedBetween(fromIso: string | null, toIso: string): RunRecord[] {
+      const rows =
+        fromIso === null
+          ? listStartedUntilStmt.all(toIso)
+          : listStartedBetweenStmt.all(fromIso, toIso);
+      return rows.map(mapRunRow);
+    },
+
+    listRawPurgeCandidates(endedBefore: string, limit: number): Array<{ id: string }> {
+      return listRawPurgeCandidatesStmt.all(endedBefore, limit).map((row) => ({
+        id: readString(row, "id", "runs"),
+      }));
+    },
+
+    markRawPurged(ids: readonly string[]): void {
+      for (const batch of chunk(ids, BATCH_SIZE)) {
+        if (batch.length === 0) {
+          continue;
+        }
+        const placeholders = batch.map(() => "?").join(", ");
+        db.prepare(`UPDATE runs SET raw_purged = 1 WHERE id IN (${placeholders});`).run(...batch);
+      }
     },
 
     listExpiredWorkerIds(before: string): string[] {

@@ -1,6 +1,8 @@
 import { openDatabase } from "./db.js";
 import { createProjectRepo } from "./projectRepo.js";
 import { createRunRepo } from "./runRepo.js";
+import { createStatsRepo } from "./statsRepo.js";
+import { createTaskRepo } from "./taskRepo.js";
 import type { Repos } from "./types.js";
 import { createWorkerRepo } from "./workerRepo.js";
 
@@ -9,8 +11,8 @@ import { createWorkerRepo } from "./workerRepo.js";
  * 事务用 SAVEPOINT 实现而不是 BEGIN：调用方哪怕把 transaction() 嵌套调用，
  * 每层也有自己独立编号的保存点，出错只回滚到当前这一层，不会因为「已经在事务里」报错。
  */
-export function createRepos(filePath: string): Repos {
-  const db = openDatabase(filePath);
+export function createRepos(filePath: string, backupDir?: string): Repos {
+  const db = openDatabase(filePath, backupDir);
   let depth = 0;
 
   function transaction<T>(fn: () => T): T {
@@ -34,6 +36,8 @@ export function createRepos(filePath: string): Repos {
     projects: createProjectRepo(db),
     workers: createWorkerRepo(db),
     runs: createRunRepo(db),
+    stats: createStatsRepo(db),
+    tasks: createTaskRepo(db),
     transaction,
     close(): void {
       db.close();

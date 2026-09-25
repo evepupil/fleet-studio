@@ -8,5 +8,7 @@ export * from "./migrations.js";
 export * from "./projectRepo.js";
 export * from "./rowMappers.js";
 export * from "./runRepo.js";
+export * from "./statsRepo.js";
+export * from "./taskRepo.js";
 export * from "./types.js";
 export * from "./workerRepo.js";

@@ -66,6 +66,21 @@ describe("错误码到状态码的映射", () => {
     expect((await readJsonBody(res)).error.code).toBe("config_invalid");
   });
 
+  it("pool_disabled 映射成 409", async () => {
+    server.service.submit = async () => {
+      throw new FleetError("pool_disabled", "点名的池已停用");
+    };
+
+    const res = await server.fetchWithToken(API_PATHS.workers, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ projectPath: "C:\\demo", cwd: "C:\\demo", prompt: "干活" }),
+    });
+
+    expect(res.status).toBe(409);
+    expect((await readJsonBody(res)).error.code).toBe("pool_disabled");
+  });
+
   it("非 FleetError 异常一律 500 internal，且只回通用说明，不泄露堆栈", async () => {
     server.service.pools = () => {
       throw new Error("这是一段不该被返回给客户端的内部堆栈信息");

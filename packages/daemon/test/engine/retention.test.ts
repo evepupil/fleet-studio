@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runRetentionSweep } from "../../src/engine/retention.js";
@@ -29,18 +29,22 @@ async function seedFinishedWorker(
 
   const runDir = engine.ctx.deps.paths.runDir(run.id);
   await mkdir(runDir, { recursive: true });
-  await writeFile(join(runDir, "out.jsonl"), "some output", "utf8");
+  await Promise.all(
+    ["out.jsonl", "err.log", "task.md", "timeline.jsonl"].map((file) =>
+      writeFile(join(runDir, file), file, "utf8"),
+    ),
+  );
   return { workerId: id, runDir };
 }
 
-describe("retention：过期清理（模块设计 3.15）", () => {
+describe("retention：原始输出清理（M5）", () => {
   let engine: TestEngine;
 
   beforeEach(async () => {
     const baseline = baselineConfig();
     engine = await createTestEngine({
       initialNowMs: NOW_MS,
-      config: { ...baseline, retentionDays: RETENTION_DAYS },
+      config: { ...baseline, rawOutputRetentionDays: RETENTION_DAYS },
     });
   });
 
@@ -48,76 +52,50 @@ describe("retention：过期清理（模块设计 3.15）", () => {
     await engine.cleanup();
   });
 
-  it("最新运行已终态且结束时间早于 cutoff：删掉苦工、运行记录和磁盘目录", async () => {
+  it("删除到期原始输出，保留时间线、任务记录、运行记录和项目，并标记运行", async () => {
     const oldEndedAt = new Date(NOW_MS - (RETENTION_DAYS + 1) * 24 * 60 * 60 * 1000).toISOString();
-    const { workerId } = await seedFinishedWorker(engine, "wold0001", oldEndedAt);
+    const { workerId, runDir } = await seedFinishedWorker(engine, "wold0001", oldEndedAt);
 
     await runRetentionSweep(engine.ctx);
 
-    expect(engine.repos.workers.get(workerId)).toBeNull();
-    expect(engine.repos.runs.get(`${workerId}.1`)).toBeNull();
+    for (const file of ["out.jsonl", "err.log", "task.md"]) {
+      await expect(stat(join(runDir, file))).rejects.toThrow();
+    }
+    await expect(readFile(join(runDir, "timeline.jsonl"), "utf8")).resolves.toBe("timeline.jsonl");
+    expect(engine.repos.workers.get(workerId)).not.toBeNull();
+    expect(engine.repos.runs.get(`${workerId}.1`)).not.toBeNull();
+    expect(engine.repos.projects.get(`c:\\code\\${workerId}`)).not.toBeNull();
+    expect(engine.repos.runs.listRawPurgeCandidates("9999-01-01T00:00:00.000Z", 10)).toEqual([]);
   });
 
-  it("结束时间在保留期内的苦工不受影响", async () => {
+  it("保留期内的原始输出不动", async () => {
     const recentEndedAt = new Date(NOW_MS - 1 * 24 * 60 * 60 * 1000).toISOString();
-    const { workerId } = await seedFinishedWorker(engine, "wnew0001", recentEndedAt);
+    const { runDir } = await seedFinishedWorker(engine, "wnew0001", recentEndedAt);
 
     await runRetentionSweep(engine.ctx);
 
+    await expect(readFile(join(runDir, "out.jsonl"), "utf8")).resolves.toBe("out.jsonl");
+    expect(engine.repos.runs.listRawPurgeCandidates("9999-01-01T00:00:00.000Z", 10)).toHaveLength(
+      1,
+    );
+  });
+
+  it("单个文件删除失败时不标记该运行，下次还会重试", async () => {
+    const oldEndedAt = new Date(NOW_MS - (RETENTION_DAYS + 1) * 24 * 60 * 60 * 1000).toISOString();
+    const { workerId, runDir } = await seedFinishedWorker(engine, "wfail001", oldEndedAt);
+    await rm(join(runDir, "out.jsonl"));
+    await mkdir(join(runDir, "out.jsonl"));
+
+    await runRetentionSweep(engine.ctx);
+
+    expect(engine.repos.runs.listRawPurgeCandidates("9999-01-01T00:00:00.000Z", 10)).toEqual([
+      { id: `${workerId}.1` },
+    ]);
+    expect(engine.logger.records.some((record) => record.level === "error")).toBe(true);
     expect(engine.repos.workers.get(workerId)).not.toBeNull();
   });
 
-  it("最新运行还没结束（工作中）：不管多久之前创建的都不删", async () => {
-    const worker = createWorkerRecord({ id: "wbusy999", createdAt: "2020-01-01T00:00:00.000Z" });
-    const run = createRunRecord({
-      id: "wbusy999.1",
-      workerId: "wbusy999",
-      status: "running",
-      startedAt: "2020-01-01T00:00:01.000Z",
-    });
-    engine.repos.projects.insert(createProjectRecord({ key: worker.projectKey, path: worker.cwd }));
-    engine.repos.workers.insert(worker);
-    engine.repos.runs.insert(run);
-
-    await runRetentionSweep(engine.ctx);
-
-    expect(engine.repos.workers.get("wbusy999")).not.toBeNull();
-  });
-
-  it("没有任何苦工、创建时间早于 cutoff 的项目会被删掉", async () => {
-    const oldCreatedAt = new Date(
-      NOW_MS - (RETENTION_DAYS + 1) * 24 * 60 * 60 * 1000,
-    ).toISOString();
-    engine.repos.projects.insert(
-      createProjectRecord({
-        key: "c:\\code\\orphan",
-        path: "C:\\code\\orphan",
-        createdAt: oldCreatedAt,
-      }),
-    );
-
-    await runRetentionSweep(engine.ctx);
-
-    expect(engine.repos.projects.get("c:\\code\\orphan")).toBeNull();
-  });
-
-  it("F6a 回归：删掉苦工时同步通知 timelineStore 忘掉它，避免缓存表只增不减", async () => {
-    const oldEndedAt = new Date(NOW_MS - (RETENTION_DAYS + 1) * 24 * 60 * 60 * 1000).toISOString();
-    const { workerId } = await seedFinishedWorker(engine, "wforget1", oldEndedAt);
-
-    const forgotten: string[] = [];
-    const originalForget = engine.ctx.timelines.forget;
-    engine.ctx.timelines.forget = (id: string): void => {
-      forgotten.push(id);
-      originalForget(id);
-    };
-
-    await runRetentionSweep(engine.ctx);
-
-    expect(forgotten).toEqual([workerId]);
-  });
-
-  it("清理完之后记一条日志，写明删了多少", async () => {
+  it("记录已清理运行的数量", async () => {
     const oldEndedAt = new Date(NOW_MS - (RETENTION_DAYS + 1) * 24 * 60 * 60 * 1000).toISOString();
     await seedFinishedWorker(engine, "wlog0001", oldEndedAt);
 
@@ -125,7 +103,7 @@ describe("retention：过期清理（模块设计 3.15）", () => {
 
     expect(
       engine.logger.records.some(
-        (record) => record.level === "info" && record.message.includes("1"),
+        (record) => record.level === "info" && record.message.includes("1 个运行"),
       ),
     ).toBe(true);
   });

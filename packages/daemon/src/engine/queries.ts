@@ -29,9 +29,10 @@ export function listWorkers(ctx: EngineContext, query: ListWorkersQuery): Worker
     ctx.deps.repos.runs.listByWorkers(workers.map((w) => w.id)),
   );
   const positions = ctx.snapshots.queuePositions();
+  const nowMs = ctx.now();
 
   const summaries = workers.map((worker) =>
-    buildWorkerSummary(worker, runsByWorkerId.get(worker.id) ?? [], config, positions),
+    buildWorkerSummary(worker, runsByWorkerId.get(worker.id) ?? [], config, positions, nowMs),
   );
   return query.status === undefined
     ? summaries
@@ -52,7 +53,14 @@ export function getWorkerDetail(ctx: EngineContext, id: string): WorkerDetail | 
   }
   const runs = ctx.deps.repos.runs.listByWorker(id);
   const config = ctx.deps.config.current();
-  return buildWorkerDetail(worker, runs, project, config, ctx.snapshots.queuePositions());
+  return buildWorkerDetail(
+    worker,
+    runs,
+    project,
+    config,
+    ctx.snapshots.queuePositions(),
+    ctx.now(),
+  );
 }
 
 /** pools()：直接取快照里已经算好的池视图，跟看板看到的口径完全一致。 */

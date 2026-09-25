@@ -22,8 +22,9 @@ export function createWorkerRepo(db: DatabaseSync): WorkerRepo {
   const existsStmt = db.prepare("SELECT 1 FROM workers WHERE id = ? LIMIT 1;");
   const insertStmt = db.prepare(
     `INSERT INTO workers
-       (id, project_key, cwd, title, role, runtime, pool_id, model, thinking, session_ref, created_at, latest_run_seq)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+       (id, project_key, cwd, title, role, runtime, pool_id, model, thinking, session_ref,
+        created_at, latest_run_seq, requested_pool, channel, model_name)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
   );
   const listRecentAllStmt = db.prepare("SELECT * FROM workers ORDER BY created_at DESC LIMIT ?;");
   const listRecentByProjectStmt = db.prepare(
@@ -54,6 +55,9 @@ export function createWorkerRepo(db: DatabaseSync): WorkerRepo {
         worker.sessionRef,
         worker.createdAt,
         worker.latestRunSeq,
+        worker.requestedPool,
+        worker.channel,
+        worker.modelName,
       );
     },
 
@@ -67,6 +71,22 @@ export function createWorkerRepo(db: DatabaseSync): WorkerRepo {
       if (patch.latestRunSeq !== undefined) {
         assignments.push("latest_run_seq = ?");
         values.push(patch.latestRunSeq);
+      }
+      if (patch.poolId !== undefined) {
+        assignments.push("pool_id = ?");
+        values.push(patch.poolId);
+      }
+      if (patch.model !== undefined) {
+        assignments.push("model = ?");
+        values.push(patch.model);
+      }
+      if (patch.channel !== undefined) {
+        assignments.push("channel = ?");
+        values.push(patch.channel);
+      }
+      if (patch.modelName !== undefined) {
+        assignments.push("model_name = ?");
+        values.push(patch.modelName);
       }
       if (assignments.length === 0) {
         return;

@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { isFleetError, ZERO_USAGE } from "@fleet/core";
+import { isFleetError } from "@fleet/core";
 import { describe, expect, it } from "vitest";
 import {
   createProjectRepo,
@@ -9,7 +9,6 @@ import {
 } from "../../src/store/index.js";
 import { createProjectRecord, createWorkerRecord } from "./factories.js";
 
-/** 每个用例独立开一个内存库，插好一个项目和一个苦工 w1 当外键落脚点。 */
 function setup(): { db: DatabaseSync; runs: ReturnType<typeof createRunRepo> } {
   const db = openDatabase(":memory:");
   createProjectRepo(db).insert(createProjectRecord({ key: "p1" }));
@@ -17,7 +16,6 @@ function setup(): { db: DatabaseSync; runs: ReturnType<typeof createRunRepo> } {
   return { db, runs: createRunRepo(db) };
 }
 
-/** 手工插入一行只满足 NOT NULL 约束的运行记录，用于构造损坏数据；worker 必须已存在。 */
 function insertRawRun(
   db: DatabaseSync,
   row: {
@@ -26,14 +24,15 @@ function insertRawRun(
     seq: number;
     status: string;
     queuedAt: string;
-    usageJson: string;
-    retryJson: string | null;
+    inputTokens?: number | string;
     failReason?: string | null;
     killedBy?: string | null;
   },
 ): void {
   db.prepare(
-    `INSERT INTO runs (id, worker_id, seq, prompt, status, fail_reason, queued_at, timeout_ms, usage_json, retry_json, killed_by, event_count)
+    `INSERT INTO runs
+       (id, worker_id, seq, prompt, status, fail_reason, queued_at, timeout_ms,
+        input_tokens, retry_json, killed_by, event_count)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
   ).run(
     row.id,
@@ -44,11 +43,24 @@ function insertRawRun(
     row.failReason ?? null,
     row.queuedAt,
     60_000,
-    row.usageJson,
-    row.retryJson,
+    row.inputTokens ?? 0,
+    null,
     row.killedBy ?? null,
     0,
   );
+}
+
+function expectInternalError(action: () => unknown, message: string): void {
+  expect.assertions(3);
+  try {
+    action();
+  } catch (error) {
+    expect(isFleetError(error)).toBe(true);
+    if (isFleetError(error)) {
+      expect(error.code).toBe("internal");
+      expect(error.message).toBe(message);
+    }
+  }
 }
 
 describe("runRepo：损坏记录", () => {
@@ -60,19 +72,8 @@ describe("runRepo：损坏记录", () => {
       seq: 1,
       status: "bogus",
       queuedAt: "2026-01-01T00:00:00.000Z",
-      usageJson: JSON.stringify(ZERO_USAGE),
-      retryJson: null,
     });
-    expect.assertions(3);
-    try {
-      runs.get("w1.1");
-    } catch (error) {
-      expect(isFleetError(error)).toBe(true);
-      if (isFleetError(error)) {
-        expect(error.code).toBe("internal");
-        expect(error.message).toBe("数据库记录损坏：runs.status = bogus");
-      }
-    }
+    expectInternalError(() => runs.get("w1.1"), "数据库记录损坏：runs.status = bogus");
   });
 
   it("fail_reason 不是合法值时读出抛中文错误", () => {
@@ -83,20 +84,9 @@ describe("runRepo：损坏记录", () => {
       seq: 1,
       status: "failed",
       queuedAt: "2026-01-01T00:00:00.000Z",
-      usageJson: JSON.stringify(ZERO_USAGE),
-      retryJson: null,
       failReason: "bogus",
     });
-    expect.assertions(3);
-    try {
-      runs.get("w1.1");
-    } catch (error) {
-      expect(isFleetError(error)).toBe(true);
-      if (isFleetError(error)) {
-        expect(error.code).toBe("internal");
-        expect(error.message).toBe("数据库记录损坏：runs.fail_reason = bogus");
-      }
-    }
+    expectInternalError(() => runs.get("w1.1"), "数据库记录损坏：runs.fail_reason = bogus");
   });
 
   it("killed_by 不是合法值时读出抛中文错误", () => {
@@ -107,23 +97,12 @@ describe("runRepo：损坏记录", () => {
       seq: 1,
       status: "cancelled",
       queuedAt: "2026-01-01T00:00:00.000Z",
-      usageJson: JSON.stringify(ZERO_USAGE),
-      retryJson: null,
       killedBy: "bogus",
     });
-    expect.assertions(3);
-    try {
-      runs.get("w1.1");
-    } catch (error) {
-      expect(isFleetError(error)).toBe(true);
-      if (isFleetError(error)) {
-        expect(error.code).toBe("internal");
-        expect(error.message).toBe("数据库记录损坏：runs.killed_by = bogus");
-      }
-    }
+    expectInternalError(() => runs.get("w1.1"), "数据库记录损坏：runs.killed_by = bogus");
   });
 
-  it("usage_json 不是合法 JSON 时读出抛中文错误", () => {
+  it("用量列非有限数字或负数时读出抛中文错误", () => {
     const { db, runs } = setup();
     insertRawRun(db, {
       id: "w1.1",
@@ -131,66 +110,43 @@ describe("runRepo：损坏记录", () => {
       seq: 1,
       status: "queued",
       queuedAt: "2026-01-01T00:00:00.000Z",
-      usageJson: "not-json",
-      retryJson: null,
+      inputTokens: "not-a-number",
     });
-    expect.assertions(3);
-    try {
-      runs.get("w1.1");
-    } catch (error) {
-      expect(isFleetError(error)).toBe(true);
-      if (isFleetError(error)) {
-        expect(error.code).toBe("internal");
-        expect(error.message).toBe("数据库记录损坏：runs.usage_json = not-json");
-      }
-    }
+    expectInternalError(() => runs.get("w1.1"), "数据库记录损坏：runs.input_tokens = not-a-number");
   });
 
-  it("usage_json 字段类型不对时读出抛中文错误", () => {
+  it("用量列为负数时读出抛中文错误", () => {
     const { db, runs } = setup();
-    const badJson = '{"inputTokens":"not-a-number"}';
     insertRawRun(db, {
       id: "w1.1",
       workerId: "w1",
       seq: 1,
       status: "queued",
       queuedAt: "2026-01-01T00:00:00.000Z",
-      usageJson: badJson,
-      retryJson: null,
+      inputTokens: -1,
     });
-    expect.assertions(3);
-    try {
-      runs.get("w1.1");
-    } catch (error) {
-      expect(isFleetError(error)).toBe(true);
-      if (isFleetError(error)) {
-        expect(error.code).toBe("internal");
-        expect(error.message).toBe(`数据库记录损坏：runs.usage_json = ${badJson}`);
-      }
-    }
+    expectInternalError(() => runs.get("w1.1"), "数据库记录损坏：runs.input_tokens = -1");
   });
 
   it("retry_json 字段类型不对时读出抛中文错误", () => {
     const { db, runs } = setup();
-    const badJson = '{"attempt":"x","max":3,"message":"m"}';
-    insertRawRun(db, {
-      id: "w1.1",
-      workerId: "w1",
-      seq: 1,
-      status: "queued",
-      queuedAt: "2026-01-01T00:00:00.000Z",
-      usageJson: JSON.stringify(ZERO_USAGE),
-      retryJson: badJson,
-    });
-    expect.assertions(3);
-    try {
-      runs.get("w1.1");
-    } catch (error) {
-      expect(isFleetError(error)).toBe(true);
-      if (isFleetError(error)) {
-        expect(error.code).toBe("internal");
-        expect(error.message).toBe(`数据库记录损坏：runs.retry_json = ${badJson}`);
-      }
-    }
+    db.prepare(
+      `INSERT INTO runs
+         (id, worker_id, seq, prompt, status, queued_at, timeout_ms, retry_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+    ).run(
+      "w1.1",
+      "w1",
+      1,
+      "任务",
+      "queued",
+      "2026-01-01T00:00:00.000Z",
+      60_000,
+      '{"attempt":"x","max":3,"message":"m"}',
+    );
+    expectInternalError(
+      () => runs.get("w1.1"),
+      '数据库记录损坏：runs.retry_json = {"attempt":"x","max":3,"message":"m"}',
+    );
   });
 });

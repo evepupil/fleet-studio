@@ -1,4 +1,12 @@
-import type { ProjectRecord, RunRecord, WorkerRecord } from "@fleet/core";
+import type {
+  ProjectRecord,
+  RunFact,
+  RunRecord,
+  TaskSortKey,
+  TaskStatusFilter,
+  WorkerFact,
+  WorkerRecord,
+} from "@fleet/core";
 
 /**
  * 存储层接口契约。调度引擎只依赖这里的接口，测试时可以换成内存实现。
@@ -16,7 +24,9 @@ export interface ProjectRepo {
 }
 
 /** 苦工可以修改的字段 */
-export type WorkerPatch = Partial<Pick<WorkerRecord, "sessionRef" | "latestRunSeq">>;
+export type WorkerPatch = Partial<
+  Pick<WorkerRecord, "sessionRef" | "latestRunSeq" | "poolId" | "model" | "channel" | "modelName">
+>;
 
 export interface WorkerRepo {
   get(id: string): WorkerRecord | null;
@@ -48,14 +58,52 @@ export interface RunRepo {
   listEndedSince(since: string): RunRecord[];
   /** 开跑时间不早于 since 的运行 */
   listStartedSince(since: string): RunRecord[];
+  /** 开跑时间不为空、且不晚于 to 的运行，from 为 null 时不设下限 */
+  listStartedBetween(fromIso: string | null, toIso: string): RunRecord[];
+  /** 可清理原始输出的运行，按结束时间升序 */
+  listRawPurgeCandidates(endedBefore: string, limit: number): Array<{ id: string }>;
+  /** 标记原始输出已清理 */
+  markRawPurged(ids: readonly string[]): void;
   /** 最新一次运行已是终态、且结束时间早于 before 的苦工编号（过期清理用） */
   listExpiredWorkerIds(before: string): string[];
+}
+
+export interface TaskQueryInput {
+  status: TaskStatusFilter;
+  projectKey?: string;
+  poolId?: string;
+  role?: string;
+  channel?: string;
+  modelName?: string;
+  createdFrom: string | null;
+  createdTo: string;
+  titleContains?: string;
+  sort: TaskSortKey;
+  order: "asc" | "desc";
+  cursor?: string;
+  limit: number;
+}
+
+export interface TaskRepo {
+  query(input: TaskQueryInput): {
+    workers: WorkerRecord[];
+    total: number;
+    nextCursor: string | null;
+  };
+}
+
+export interface StatsRepo {
+  runFacts(sinceIso: string | null): RunFact[];
+  workerFacts(sinceIso: string | null, alsoIds: readonly string[]): WorkerFact[];
+  seriesColor(kind: "model" | "channel" | "role", name: string, nowIso: string): number;
 }
 
 export interface Repos {
   projects: ProjectRepo;
   workers: WorkerRepo;
   runs: RunRepo;
+  stats: StatsRepo;
+  tasks: TaskRepo;
   /** 在一个事务里执行，出错整体回滚 */
   transaction<T>(fn: () => T): T;
   close(): void;

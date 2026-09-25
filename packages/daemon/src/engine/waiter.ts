@@ -19,6 +19,7 @@ interface WaiterDeps {
   repos: Repos;
   config: ConfigStore;
   events: EventBus;
+  now: () => number;
 }
 
 interface CheckResult {
@@ -31,7 +32,7 @@ function isSatisfied(result: CheckResult, mode: WaitMode): boolean {
 }
 
 export function createWaiter(deps: WaiterDeps): Waiter {
-  const { repos, config, events } = deps;
+  const { repos, config, events, now } = deps;
 
   function checkNow(ids: readonly string[]): CheckResult {
     const currentConfig = config.current();
@@ -56,7 +57,7 @@ export function createWaiter(deps: WaiterDeps): Waiter {
       }
       const latest = findLatestRun(worker, runs);
       if (latest !== null && isTerminalStatus(latest.status)) {
-        done.push(buildWorkerSummary(worker, runs, currentConfig, NO_QUEUE_POSITIONS));
+        done.push(buildWorkerSummary(worker, runs, currentConfig, NO_QUEUE_POSITIONS, now()));
       } else {
         pending.push(id);
       }

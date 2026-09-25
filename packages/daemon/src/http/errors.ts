@@ -15,6 +15,7 @@ const STATUS_BY_CODE: Record<ErrorCode, ContentfulStatusCode> = {
   not_found: 404,
   conflict: 409,
   illegal_transition: 409,
+  pool_disabled: 409,
   runtime_unavailable: 422,
   config_invalid: 500,
   internal: 500,
@@ -55,6 +56,24 @@ export function parseOrThrow<T>(
 ): T {
   if (!result.success) {
     throw toValidationError(result.error.issues);
+  }
+  return result.data;
+}
+
+/**
+ * 和 parseOrThrow 一样，但只报第一条问题。统计接口的查询参数可能同时命中多条规则，
+ * 看板只需要展示一条，避免把一串问题都糊在界面上。
+ */
+export function parseFirstIssueOrThrow<T>(
+  result:
+    | { readonly success: true; readonly data: T }
+    | {
+        readonly success: false;
+        readonly error: { readonly issues: readonly ValidationIssueLike[] };
+      },
+): T {
+  if (!result.success) {
+    throw toValidationError(result.error.issues.slice(0, 1));
   }
   return result.data;
 }

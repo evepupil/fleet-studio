@@ -37,8 +37,16 @@ export interface ConfigStore {
   error(): string | null;
   /** 配置生效内容或错误状态变化时回调；返回取消订阅函数 */
   onChange(listener: () => void): () => void;
-  /** 写回配置文件并立即生效 */
+  /** 写回配置文件并立即生效（写之前先备份，见 updateRaw） */
   save(config: FleetConfig): Promise<void>;
+  /**
+   * 在配置文件的原始 JSON 上做修改并写回、立即生效（第二版：看板启停池、调顺序用它）。
+   * 读当前文件原文 → JSON.parse → edit(原始对象) → 用 parseConfig 校验结果（不合法抛 FleetError("config_invalid")，文件不动）
+   * → 把当前文件复制到 <home>/config-backups/config-<UTC 时间，冒号换成短横>.json（只留最近 50 份）
+   * → 两空格缩进写临时文件再改名替换 → 更新 current、通知订阅者。
+   * 多次调用排队串行执行，不会交叉写。edit 抛出的 FleetError 原样抛给调用方。
+   */
+  updateRaw(edit: (raw: unknown) => unknown): Promise<void>;
   close(): void;
 }
 

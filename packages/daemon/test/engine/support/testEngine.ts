@@ -96,8 +96,14 @@ export async function createTestEngine(options: CreateTestEngineOptions = {}): P
 
   const events = createEventBus(logger);
   const timelines = createTimelineStore({ repos, paths, logger, events });
-  const snapshots = createSnapshotService({ repos, config, version: deps.version, now });
-  const waiter = createWaiter({ repos, config, events });
+  const snapshots = createSnapshotService({
+    repos,
+    config,
+    logger,
+    version: deps.version,
+    now,
+  });
+  const waiter = createWaiter({ repos, config, events, now });
 
   const ctx: EngineContext = {
     deps,

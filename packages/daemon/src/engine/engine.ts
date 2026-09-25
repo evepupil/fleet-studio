@@ -3,10 +3,15 @@ import type {
   ListWorkersQuery,
   PoolPatch,
   PoolView,
+  ProjectInfo,
   RoleView,
   SendRequest,
   Snapshot,
+  StatsQuery,
+  StatsResponse,
   SubmitRequest,
+  TaskPage,
+  TasksQuery,
   TimelinePage,
   WaitResult,
   WorkerDetail,
@@ -15,6 +20,7 @@ import type {
 import { cancelWorker } from "./cancel.js";
 import { createDispatcher } from "./dispatcher.js";
 import { createEventBus } from "./events.js";
+import { reorderPools, setPoolEnabled } from "./poolSettings.js";
 import {
   getHealth,
   getWorkerDetail,
@@ -27,7 +33,9 @@ import { runRecovery } from "./recovery.js";
 import { runRetentionSweep } from "./retention.js";
 import type { ServiceEvent, WaitMode } from "./service.js";
 import { createSnapshotService } from "./snapshotService.js";
+import { queryStats } from "./statsQueries.js";
 import { sendToWorker, submitWorker } from "./submit.js";
+import { listProjects, queryTasks } from "./taskQueries.js";
 import { createTimelineStore } from "./timelineStore.js";
 import { runTimeoutSweep } from "./timeouts.js";
 import type { Engine, EngineContext, EngineDeps } from "./types.js";
@@ -59,10 +67,11 @@ export function createEngine(deps: EngineDeps): Engine {
   const snapshots = createSnapshotService({
     repos: deps.repos,
     config: deps.config,
+    logger: deps.logger,
     version: deps.version,
     now,
   });
-  const waiter = createWaiter({ repos: deps.repos, config: deps.config, events });
+  const waiter = createWaiter({ repos: deps.repos, config: deps.config, events, now });
 
   const ctx: EngineContext = {
     deps,
@@ -156,6 +165,21 @@ export function createEngine(deps: EngineDeps): Engine {
     patchPool(id: string, patch: PoolPatch): Promise<PoolView> {
       return patchPool(ctx, id, patch);
     },
+    setPoolEnabled(id: string, enabled: boolean): Promise<PoolView> {
+      return setPoolEnabled(ctx, id, enabled);
+    },
+    reorderPools(poolIds: readonly string[]): Promise<PoolView[]> {
+      return reorderPools(ctx, poolIds);
+    },
+    stats(query: StatsQuery): StatsResponse {
+      return queryStats(ctx, query);
+    },
+    tasks(query: TasksQuery): TaskPage {
+      return queryTasks(ctx, query);
+    },
+    projects(): ProjectInfo[] {
+      return listProjects(ctx);
+    },
     roles(): RoleView[] {
       return listRoles(ctx);
     },
@@ -178,7 +202,7 @@ export function createEngine(deps: EngineDeps): Engine {
       try {
         await runRetentionSweep(ctx);
       } catch (error) {
-        deps.logger.error("服务启动时的过期清理出错", error);
+        deps.logger.error("服务启动时的原始输出清理出错", error);
       }
 
       unsubscribeConfig = deps.config.onChange(() => {
@@ -197,7 +221,7 @@ export function createEngine(deps: EngineDeps): Engine {
         void runTimeoutSweep(ctx).catch((error) => deps.logger.error("超时检查出错", error));
       }, intervals.timeoutSweepMs);
       retentionSweepTimer = setInterval(() => {
-        void runRetentionSweep(ctx).catch((error) => deps.logger.error("过期清理出错", error));
+        void runRetentionSweep(ctx).catch((error) => deps.logger.error("原始输出清理出错", error));
       }, intervals.retentionSweepMs);
 
       ctx.requestDispatch();

@@ -1,8 +1,11 @@
 import {
   type HealthInfo,
   type PoolView,
+  type ProjectInfo,
   type RoleView,
   type Snapshot,
+  type StatsResponse,
+  type TaskPage,
   type TimelineEvent,
   type WorkerDetail,
   type WorkerSummary,
@@ -35,8 +38,11 @@ export function createWorkerSummary(overrides: Partial<WorkerSummary> = {}): Wor
     role: "test",
     roleLabel: "测试",
     runtime: "pi",
+    requestedPool: "default",
     poolId: "default",
     model: "mcgrox/deepseek-v4.1-flash",
+    channel: "mcgrox",
+    modelName: "deepseek-v4.1-flash",
     status: "queued",
     failReason: null,
     errorMessage: null,
@@ -50,6 +56,7 @@ export function createWorkerSummary(overrides: Partial<WorkerSummary> = {}): Wor
     retry: null,
     verdict: null,
     usage: ZERO_USAGE,
+    runMs: 0,
     queuePosition: 1,
     ...overrides,
   };
@@ -71,6 +78,10 @@ export function createPoolView(overrides: Partial<PoolView> = {}): PoolView {
     id: "default",
     label: "默认池",
     model: "mcgrox/deepseek-v4.1-flash",
+    channel: "mcgrox",
+    modelName: "deepseek-v4.1-flash",
+    priority: 1,
+    enabled: true,
     capacity: 20,
     perProjectCap: null,
     running: 0,
@@ -78,6 +89,7 @@ export function createPoolView(overrides: Partial<PoolView> = {}): PoolView {
     slots: [],
     queuedByProject: [],
     health: { windowMinutes: 60, completed: 0, failed: 0, retrying: 0 },
+    recent: { windowHours: 24, completed: 0, failed: 0, avgRunMs: null },
     usageToday: ZERO_USAGE,
     ...overrides,
   };
@@ -97,10 +109,48 @@ export function createSnapshot(overrides: Partial<Snapshot> = {}): Snapshot {
     version: "0.1.0-test",
     serverTime: "2026-09-23T00:00:00.000Z",
     pools: [createPoolView()],
+    sharedQueued: 0,
+    live: { slotsUsed: 0, slotsTotal: 20, running: 0, queued: 0, retrying: 0 },
     projects: [],
     workers: [],
     roles: [createRoleView()],
     configError: null,
+    ...overrides,
+  };
+}
+
+export function createProjectInfo(overrides: Partial<ProjectInfo> = {}): ProjectInfo {
+  return {
+    key: "c:\\code\\demo",
+    path: "C:\\code\\demo",
+    name: "demo",
+    colorIndex: 0,
+    ...overrides,
+  };
+}
+
+/** 统计响应只给「跑得通的最小值」，单个测试按需覆盖自己关心的字段。 */
+export function createStatsResponse(overrides: Partial<StatsResponse> = {}): StatsResponse {
+  const totals = { usage: ZERO_USAGE, tasks: 0, runMs: 0, avgRunMs: null };
+  return {
+    range: { kind: "all", from: null, to: "2026-09-23T00:00:00.000Z" },
+    dimension: "model",
+    granularity: "day",
+    buckets: [],
+    total: totals,
+    today: totals,
+    tokenShare: [],
+    tasksByProject: [],
+    tokenTrend: [],
+    ...overrides,
+  };
+}
+
+export function createTaskPage(overrides: Partial<TaskPage> = {}): TaskPage {
+  return {
+    items: [],
+    nextCursor: null,
+    total: 0,
     ...overrides,
   };
 }

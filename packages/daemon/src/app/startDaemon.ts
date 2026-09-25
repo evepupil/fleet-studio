@@ -104,7 +104,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
   await ensureNoOtherInstanceRunning(paths);
 
   const config = openConfigStore(paths.configFile, logger);
-  const repos = createRepos(paths.dbFile);
+  const repos = createRepos(paths.dbFile, paths.dbBackupsDir);
 
   // 装配到一半失败时，catch 需要知道具体走到哪一步：引擎建好、HTTP 真正监听之后才
   // 分别赋值，失败时按"已经创建成功的部分"清理，避免 HTTP 还在监听、daemon.json 还留着，
@@ -118,6 +118,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
     const startedAt = new Date().toISOString();
     const webDistDir = options.webDistDir ?? join(options.repoRoot, "apps", "web", "dist");
     const token = randomBytes(24).toString("hex");
+    const dashboardToken = randomBytes(24).toString("hex");
 
     // 端口要等 HTTP 真正监听后才知道（尤其是传 0 由系统分配时），引擎和接口层都只拿一个
     // 读取回调，实际值在 bindHttpServer 之后才写进这个闭包变量。
@@ -144,7 +145,14 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
       },
     });
 
-    const app = createHttpApp({ service: engine, token, getPort, webDistDir, logger });
+    const app = createHttpApp({
+      service: engine,
+      token,
+      dashboardToken,
+      getPort,
+      webDistDir,
+      logger,
+    });
 
     const requestedPort = options.port ?? config.current().port;
     httpHandle = await bindHttpServer(app, requestedPort);

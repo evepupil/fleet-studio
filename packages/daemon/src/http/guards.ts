@@ -56,8 +56,8 @@ function tokensMatch(provided: string, expected: string): boolean {
   return timingSafeEqual(providedBytes, expectedBytes);
 }
 
-/** 令牌校验（第三道）：只挂在会改变状态的路由上。 */
-export function tokenGuard(token: string): MiddlewareHandler {
+/** 令牌校验（第三道）：只认命令行令牌，挂在会改变状态的路由上。 */
+export function requireCliToken(token: string): MiddlewareHandler {
   return async (c, next) => {
     const provided = c.req.header(TOKEN_HEADER);
     if (provided === undefined || !tokensMatch(provided, token)) {
@@ -68,7 +68,28 @@ export function tokenGuard(token: string): MiddlewareHandler {
 }
 
 /**
- * 内容类型与大小校验（第四道）：带请求体的 POST / PATCH 必须是 application/json，
+ * 令牌校验（第三道）：命令行令牌或看板令牌任一匹配即可。
+ * 只挂在启停池、调顺序两个 PUT 路由上；看板令牌不能派活、续接、取消、改容量、关服务，
+ * 那些路由仍然用 requireCliToken。两个令牌都用定长比较，比较顺序不影响安全。
+ */
+export function requireCliOrDashboardToken(
+  cliToken: string,
+  dashboardToken: string,
+): MiddlewareHandler {
+  return async (c, next) => {
+    const provided = c.req.header(TOKEN_HEADER);
+    if (
+      provided === undefined ||
+      (!tokensMatch(provided, cliToken) && !tokensMatch(provided, dashboardToken))
+    ) {
+      throw new FleetError("unauthorized", "缺少或者不正确的本机令牌");
+    }
+    await next();
+  };
+}
+
+/**
+ * 内容类型与大小校验（第四道）：带请求体的 POST / PUT / PATCH 必须是 application/json，
  * 且不超过 maxBytes；返回解析后的原始 JSON（还没做业务字段校验，交给调用方用 zod 模式处理）。
  *
  * Content-Length 头只做“提前拦截明显超限”的优化；真正生效的判断是读到内容后按实际字节数核对，

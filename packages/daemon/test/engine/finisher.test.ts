@@ -59,6 +59,43 @@ describe("finishRun：收尾（模块设计 3.7）", () => {
     expect(updated?.eventCount).toBe(5);
   });
 
+  it("收尾时记录 endedAt 与 startedAt 的毫秒差", async () => {
+    const { worker, run } = seedRunningRun(engine, {
+      startedAt: "2026-01-01T00:00:03.000Z",
+    });
+    engine.setNow(Date.parse("2026-01-01T00:00:10.000Z"));
+
+    await finishRun(engine.ctx, {
+      run,
+      worker,
+      outcome: { status: "completed", failReason: null, message: null },
+      exitCode: 0,
+      usage: run.usage,
+      activity: run.activity,
+      finalText: run.finalText,
+      eventCount: run.eventCount,
+    });
+
+    expect(engine.repos.runs.get(run.id)?.runMs).toBe(7000);
+  });
+
+  it("未开跑就结束的运行 runMs 保持 null", async () => {
+    const { worker, run } = seedRunningRun(engine, { status: "queued", startedAt: null });
+
+    await finishRun(engine.ctx, {
+      run,
+      worker,
+      outcome: { status: "failed", failReason: "pool_removed", message: "池已删除" },
+      exitCode: null,
+      usage: run.usage,
+      activity: run.activity,
+      finalText: run.finalText,
+      eventCount: run.eventCount,
+    });
+
+    expect(engine.repos.runs.get(run.id)?.runMs).toBeNull();
+  });
+
   it("刷新时间线：出现 run_end", async () => {
     const { worker, run } = seedRunningRun(engine);
     await finishRun(engine.ctx, {

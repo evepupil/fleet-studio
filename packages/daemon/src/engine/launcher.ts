@@ -108,6 +108,9 @@ async function prepareAndSpawn(
   worker: WorkerRecord,
 ): Promise<PreparedLaunch> {
   const config = ctx.deps.config.current();
+  if (worker.poolId === null) {
+    throw new Error(`苦工 ${worker.id} 尚未分配模型池`);
+  }
   const pool = findPool(config, worker.poolId);
   if (pool === null) {
     throw new Error(`所在的池 ${worker.poolId} 已从配置中删除`);

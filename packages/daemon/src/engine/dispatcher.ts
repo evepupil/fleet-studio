@@ -1,13 +1,7 @@
-import {
-  findPool,
-  type PoolLimit,
-  planDispatch,
-  type QueuedEntry,
-  type RunningEntry,
-  type RunRecord,
-} from "@fleet/core";
+import { FleetError, findPool, planDispatch, poolChannelModel, type RunRecord } from "@fleet/core";
 import { finishRun } from "./finisher.js";
 import { launchRun } from "./launcher.js";
+import { buildSchedulingInputs } from "./schedulingInputs.js";
 import type { EngineContext } from "./types.js";
 
 export interface Dispatcher {
@@ -68,48 +62,64 @@ async function runDispatchCycle(ctx: EngineContext): Promise<void> {
       .map((worker) => [worker.id, worker] as const),
   );
   const config = ctx.deps.config.current();
-  const limits: PoolLimit[] = config.pools.map((pool) => ({
-    poolId: pool.id,
-    capacity: pool.capacity,
-    perProjectCap: pool.perProjectCap,
-  }));
-
-  const running: RunningEntry[] = [];
-  const queued: QueuedEntry[] = [];
-  for (const run of active) {
-    const worker = workerById.get(run.workerId);
-    if (worker === undefined) {
-      continue; // 数据不一致：运行找不到所属苦工，防御性跳过
-    }
-    if (run.status === "running") {
-      running.push({ runId: run.id, poolId: worker.poolId, projectKey: worker.projectKey });
-    } else {
-      queued.push({
-        runId: run.id,
-        poolId: worker.poolId,
-        projectKey: worker.projectKey,
-        queuedAt: run.queuedAt,
-      });
-    }
-  }
-
+  const { limits, running, queued } = buildSchedulingInputs(
+    config,
+    active,
+    workerById,
+    ctx.deps.logger,
+  );
   const toDispatch = planDispatch(limits, running, queued);
   const startedAt = new Date(ctx.now()).toISOString();
 
-  for (const runId of toDispatch) {
-    const run = ctx.deps.repos.runs.get(runId);
-    const worker = run !== null ? workerById.get(run.workerId) : undefined;
-    if (run === null || run.status !== "queued" || worker === undefined) {
+  for (const decision of toDispatch) {
+    const run = ctx.deps.repos.runs.get(decision.runId);
+    const worker = run === null ? null : ctx.deps.repos.workers.get(run.workerId);
+    if (run === null || run.status !== "queued" || worker === null) {
       continue; // 防御：这一轮里状态已经被别的路径改变
     }
 
-    // 先占住槽位再交给启动器：防止下一轮（甚至同一轮的重入）重复放行同一个运行。
-    ctx.deps.repos.runs.update(run.id, { status: "running", startedAt });
+    const currentConfig = ctx.deps.config.current();
+    const pool = findPool(currentConfig, decision.poolId);
+    if (pool === null || !pool.enabled || (worker.poolId !== null && worker.poolId !== pool.id)) {
+      continue;
+    }
+
+    const model = worker.poolId === null ? poolChannelModel(pool, worker.runtime) : null;
+    if (worker.poolId === null && model === null) {
+      ctx.deps.logger.error(
+        `派活决策为运行 ${run.id} 选择了未配置 ${worker.runtime} 的池 ${pool.id}`,
+        new FleetError("internal", "派活决策与池运行时配置不一致"),
+      );
+      continue;
+    }
+
+    // 未点名任务在确定实际池时与运行占位同事务写入，避免崩溃后留下半分配记录。
+    ctx.deps.repos.transaction(() => {
+      if (worker.poolId === null && model !== null) {
+        ctx.deps.repos.workers.update(worker.id, {
+          poolId: pool.id,
+          model: model.display,
+          channel: model.channel,
+          modelName: model.modelName,
+        });
+      }
+      ctx.deps.repos.runs.update(run.id, { status: "running", startedAt });
+    });
     const updatedRun: RunRecord = { ...run, status: "running", startedAt };
+    const launchWorker =
+      worker.poolId === null && model !== null
+        ? {
+            ...worker,
+            poolId: pool.id,
+            model: model.display,
+            channel: model.channel,
+            modelName: model.modelName,
+          }
+        : worker;
     ctx.notifyWorker(worker.id);
 
-    void launchRun(ctx, updatedRun, worker).catch((error) => {
-      ctx.deps.logger.error(`运行 ${runId} 启动出错`, error);
+    void launchRun(ctx, updatedRun, launchWorker).catch((error) => {
+      ctx.deps.logger.error(`运行 ${decision.runId} 启动出错`, error);
     });
   }
 }
@@ -129,7 +139,11 @@ async function failPoolRemovedRuns(ctx: EngineContext): Promise<void> {
 
   for (const run of queuedRuns) {
     const worker = workerById.get(run.workerId);
-    if (worker === undefined || findPool(config, worker.poolId) !== null) {
+    if (
+      worker === undefined ||
+      worker.poolId === null ||
+      findPool(config, worker.poolId) !== null
+    ) {
       continue;
     }
     try {

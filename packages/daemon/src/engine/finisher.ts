@@ -35,11 +35,14 @@ export async function finishRun(ctx: EngineContext, input: FinishInput): Promise
   }
   assertTransition(freshRun.status, outcome.status);
 
+  const endedAt = new Date(ctx.now()).toISOString();
   const patch: RunPatch = {
     status: outcome.status,
     failReason: outcome.failReason,
     errorMessage: outcome.message,
-    endedAt: new Date(ctx.now()).toISOString(),
+    endedAt,
+    runMs:
+      freshRun.startedAt === null ? null : Date.parse(endedAt) - Date.parse(freshRun.startedAt),
     exitCode: input.exitCode,
     usage: input.usage,
     retry: null,

@@ -1,42 +1,43 @@
 import { rm } from "node:fs/promises";
+import { join } from "node:path";
 import type { EngineContext } from "./types.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const BATCH_SIZE = 200;
+const RAW_OUTPUT_FILES = ["out.jsonl", "err.log", "task.md"] as const;
 
-/**
- * 过期清理（模块设计 3.15）：启动时和之后每小时跑一次。
- * 删掉最新一次运行已是终态、且结束时间早于 cutoff 的苦工——连同它们全部运行的磁盘目录，
- * 再删没有任何苦工、创建时间早于 cutoff 的项目。单个目录删不掉不影响其它苦工的清理。
- */
+/** 原始输出清理：启动时和之后每小时跑一次，任务记录与解析后的时间线永久保留。 */
 export async function runRetentionSweep(ctx: EngineContext): Promise<void> {
   const config = ctx.deps.config.current();
-  const cutoff = new Date(ctx.now() - config.retentionDays * DAY_MS).toISOString();
+  const cutoff = new Date(ctx.now() - config.rawOutputRetentionDays * DAY_MS).toISOString();
+  let purgedCount = 0;
 
-  const workerIds = ctx.deps.repos.runs.listExpiredWorkerIds(cutoff);
-  if (workerIds.length > 0) {
-    const runs = ctx.deps.repos.runs.listByWorkers(workerIds);
-    for (const run of runs) {
-      try {
-        await rm(ctx.deps.paths.runDir(run.id), { recursive: true, force: true });
-      } catch (error) {
-        ctx.deps.logger.error(`过期清理删除运行目录失败：${run.id}`, error);
+  while (true) {
+    const candidates = ctx.deps.repos.runs.listRawPurgeCandidates(cutoff, BATCH_SIZE);
+    if (candidates.length === 0) {
+      break;
+    }
+
+    const purgedIds: string[] = [];
+    for (const { id } of candidates) {
+      const runDir = ctx.deps.paths.runDir(id);
+      const results = await Promise.allSettled(
+        RAW_OUTPUT_FILES.map((file) => rm(join(runDir, file), { force: true })),
+      );
+      const failure = results.find((result) => result.status === "rejected");
+      if (failure?.status === "rejected") {
+        ctx.deps.logger.error(`原始输出清理删除文件失败：${id}`, failure.reason);
+        continue;
       }
+      purgedIds.push(id);
     }
-    // workers 表对 runs 有 ON DELETE CASCADE，删苦工会一并删掉它的全部运行记录。
-    ctx.deps.repos.workers.deleteMany(workerIds);
-    // 评审 F6a：苦工都删了，timelineStore 里对应的缓存和常驻标记也要一并清掉，
-    // 否则这两张表会随着「建档又过期」的苦工数量只增不减。
-    for (const workerId of workerIds) {
-      ctx.timelines.forget(workerId);
+
+    if (purgedIds.length === 0) {
+      break;
     }
+    ctx.deps.repos.runs.markRawPurged(purgedIds);
+    purgedCount += purgedIds.length;
   }
 
-  const orphanCount = ctx.deps.repos.projects.deleteOrphansCreatedBefore(cutoff);
-  ctx.deps.logger.info(
-    `过期清理：删除了 ${workerIds.length} 个苦工、${orphanCount} 个没有苦工的项目`,
-  );
-
-  if (workerIds.length > 0) {
-    ctx.notifySnapshot();
-  }
+  ctx.deps.logger.info(`原始输出清理：标记了 ${purgedCount} 个运行`);
 }

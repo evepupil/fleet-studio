@@ -3,10 +3,15 @@ import type {
   ListWorkersQuery,
   PoolPatch,
   PoolView,
+  ProjectInfo,
   RoleView,
   SendRequest,
   Snapshot,
+  StatsQuery,
+  StatsResponse,
   SubmitRequest,
+  TaskPage,
+  TasksQuery,
   TimelinePage,
   WaitResult,
   WorkerDetail,
@@ -14,7 +19,7 @@ import type {
 } from "@fleet/core";
 import { vi } from "vitest";
 import type { FleetService, ServiceEvent } from "../../src/engine/service.js";
-import { createHealth, createSnapshot } from "./fixtures.js";
+import { createHealth, createSnapshot, createStatsResponse, createTaskPage } from "./fixtures.js";
 
 /**
  * 假服务：实现接口层唯一依赖的 FleetService 契约，方法全部是 vi.fn()，
@@ -63,6 +68,15 @@ export function createFakeService(overrides: Partial<FleetService> = {}): FakeSe
     patchPool: vi.fn((_id: string, _patch: PoolPatch): Promise<PoolView> => {
       throw new Error("测试没有配置 patchPool 的行为");
     }),
+    setPoolEnabled: vi.fn((_id: string, _enabled: boolean): Promise<PoolView> => {
+      throw new Error("测试没有配置 setPoolEnabled 的行为");
+    }),
+    reorderPools: vi.fn((_poolIds: readonly string[]): Promise<PoolView[]> => {
+      throw new Error("测试没有配置 reorderPools 的行为");
+    }),
+    stats: vi.fn((_query: StatsQuery): StatsResponse => createStatsResponse()),
+    tasks: vi.fn((_query: TasksQuery): TaskPage => createTaskPage()),
+    projects: vi.fn((): ProjectInfo[] => []),
     roles: vi.fn((): RoleView[] => []),
     subscribe: (listener: (event: ServiceEvent) => void) => {
       listeners.add(listener);

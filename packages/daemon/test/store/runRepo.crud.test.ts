@@ -56,6 +56,27 @@ describe("runRepo：get / insert / update", () => {
     expect(runs.get("w1.1")).toEqual(run);
   });
 
+  it("runMs 与结构化用量列往返一致", () => {
+    const { runs } = setup();
+    const run = createRunRecord({
+      id: "w1.1",
+      workerId: "w1",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: "2026-01-01T00:01:00.000Z",
+      runMs: 60_000,
+      usage: {
+        inputTokens: 10,
+        outputTokens: 20,
+        cacheReadTokens: 3,
+        cacheWriteTokens: 4,
+        totalTokens: 37,
+        costUsd: null,
+      },
+    });
+    runs.insert(run);
+    expect(runs.get(run.id)).toEqual(run);
+  });
+
   it("insert：costUsd 为 null、retry 为 null 时也能正确往返", () => {
     const { runs } = setup();
     const run = createRunRecord({ id: "w1.1", workerId: "w1", usage: ZERO_USAGE, retry: null });

@@ -18,10 +18,10 @@
  * 那个端口还有没有在响应——不这样做的话，第二次 startDaemon 永远用端口 0 重新要一个
  * 空闲端口，就算第一次泄漏的 HTTP 服务没关也不会露出来，测试会在没修的代码上一样通过。
  */
-import { mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { API_PATHS } from "@fleet/core";
+import { API_PATHS, TOKEN_HEADER } from "@fleet/core";
 import { describe, expect, it } from "vitest";
 import { startDaemon } from "../../src/app/startDaemon.js";
 import { createTempDir, removeTempDir } from "./support/tempDir.js";
@@ -83,6 +83,60 @@ describe("startDaemon", () => {
     } finally {
       await handle.stop(); // 幂等：上面已经 stop 过也不会重复关闭或报错
       await removeTempDir(dir);
+    }
+  });
+
+  it("看板令牌由 HTTP 注入，能启停池但不写入 daemon.json", async () => {
+    const dir = await createTempDir("fleet-startdaemon-dashboard-token-");
+    const webDistDir = await createTempDir("fleet-startdaemon-dashboard-web-");
+    await writeFile(
+      join(webDistDir, "index.html"),
+      "<!doctype html><html><head></head><body>dashboard</body></html>",
+      "utf8",
+    );
+    const handle = await startDaemon({
+      home: dir,
+      port: 0,
+      repoRoot: REPO_ROOT,
+      webDistDir,
+      version: "0.0.0-test",
+    });
+    try {
+      const html = await (await fetch(`http://127.0.0.1:${handle.port}/`)).text();
+      const match = html.match(/name="fleet-dashboard-token" content="([^"]+)"/);
+      const dashboardToken = match?.[1];
+      expect(dashboardToken).toBeTruthy();
+
+      const info = JSON.parse(await readFile(join(dir, "daemon.json"), "utf8")) as Record<
+        string,
+        unknown
+      >;
+      expect(info).not.toHaveProperty("dashboardToken");
+
+      const poolsResponse = await fetch(`http://127.0.0.1:${handle.port}${API_PATHS.pools}`);
+      const pools = (await poolsResponse.json()) as Array<{ id: string; enabled: boolean }>;
+      const pool = pools[0];
+      if (pool === undefined || dashboardToken === undefined) {
+        throw new Error("启动后应有默认池和注入的看板令牌");
+      }
+      const update = await fetch(
+        `http://127.0.0.1:${handle.port}${API_PATHS.poolEnabled(pool.id)}`,
+        {
+          method: "PUT",
+          headers: {
+            [TOKEN_HEADER]: dashboardToken,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ enabled: false }),
+        },
+      );
+
+      expect(update.ok).toBe(true);
+      expect(await update.json()).toMatchObject({ id: pool.id, enabled: false });
+    } finally {
+      await handle.stop();
+      await removeTempDir(dir);
+      await removeTempDir(webDistDir);
     }
   });
 

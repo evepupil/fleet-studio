@@ -5,9 +5,11 @@ import {
   type RetryInfo,
   RUN_STATUSES,
   RUNTIME_IDS,
+  type RunFact,
   type RunRecord,
   THINKING_LEVELS,
   type Usage,
+  type WorkerFact,
   type WorkerRecord,
 } from "@fleet/core";
 
@@ -35,15 +37,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * noPropertyAccessFromIndexSignature 规则只能用方括号取值。
  * `Record<string, unknown>` 赋值给下面这两个形状是结构兼容的普通赋值，不是强转。
  */
-interface UsageShape {
-  inputTokens?: unknown;
-  outputTokens?: unknown;
-  cacheReadTokens?: unknown;
-  cacheWriteTokens?: unknown;
-  totalTokens?: unknown;
-  costUsd?: unknown;
-}
-
 interface RetryShape {
   attempt?: unknown;
   max?: unknown;
@@ -105,6 +98,35 @@ export function readNullableInteger(
   return value;
 }
 
+export function readNullableNumber(
+  row: Record<string, unknown>,
+  column: string,
+  table: string,
+): number | null {
+  const value = row[column];
+  if (value === null) {
+    return null;
+  }
+  // 只查 typeof 会放行正负无穷（费用列一旦被写成 Infinity，下游统计会被污染），
+  // 口径和 readNonNegativeNumber 一致：不是有限数字就算记录损坏。
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw corrupted(table, column, value);
+  }
+  return value;
+}
+
+export function readNonNegativeNumber(
+  row: Record<string, unknown>,
+  column: string,
+  table: string,
+): number {
+  const value = row[column];
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw corrupted(table, column, value);
+  }
+  return value;
+}
+
 export function readEnum<T extends string>(
   row: Record<string, unknown>,
   column: string,
@@ -134,40 +156,15 @@ export function readNullableEnum<T extends string>(
   throw corrupted(table, column, value);
 }
 
-/** usage_json：一次运行的用量，JSON 序列化成一列存，省一张一对一的小表。 */
-export function readUsage(row: Record<string, unknown>, column: string, table: string): Usage {
-  const raw = readString(row, column, table);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw corrupted(table, column, raw);
-  }
-  if (!isRecord(parsed)) {
-    throw corrupted(table, column, raw);
-  }
-  const shape: UsageShape = parsed;
-  const inputTokens = shape.inputTokens;
-  const outputTokens = shape.outputTokens;
-  const cacheReadTokens = shape.cacheReadTokens;
-  const cacheWriteTokens = shape.cacheWriteTokens;
-  const totalTokens = shape.totalTokens;
-  const costUsd = shape.costUsd;
-  if (
-    typeof inputTokens !== "number" ||
-    typeof outputTokens !== "number" ||
-    typeof cacheReadTokens !== "number" ||
-    typeof cacheWriteTokens !== "number" ||
-    typeof totalTokens !== "number" ||
-    !(typeof costUsd === "number" || costUsd === null)
-  ) {
-    throw corrupted(table, column, raw);
-  }
-  return { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, totalTokens, costUsd };
-}
-
-export function usageToJson(usage: Usage): string {
-  return JSON.stringify(usage);
+export function readUsage(row: Record<string, unknown>, table: string): Usage {
+  return {
+    inputTokens: readNonNegativeNumber(row, "input_tokens", table),
+    outputTokens: readNonNegativeNumber(row, "output_tokens", table),
+    cacheReadTokens: readNonNegativeNumber(row, "cache_read_tokens", table),
+    cacheWriteTokens: readNonNegativeNumber(row, "cache_write_tokens", table),
+    totalTokens: readNonNegativeNumber(row, "total_tokens", table),
+    costUsd: readNullableNumber(row, "cost_usd", table),
+  };
 }
 
 /** retry_json：正在自动重试时的信息；不在重试时整列为 null。 */
@@ -224,12 +221,42 @@ export function mapWorkerRow(row: Record<string, unknown>): WorkerRecord {
     title: readString(row, "title", "workers"),
     role: readString(row, "role", "workers"),
     runtime: readEnum(row, "runtime", "workers", RUNTIME_IDS),
-    poolId: readString(row, "pool_id", "workers"),
-    model: readString(row, "model", "workers"),
+    poolId: readNullableString(row, "pool_id", "workers"),
+    model: readNullableString(row, "model", "workers"),
+    channel: readNullableString(row, "channel", "workers"),
+    modelName: readNullableString(row, "model_name", "workers"),
+    requestedPool: readNullableString(row, "requested_pool", "workers"),
     thinking: readNullableEnum(row, "thinking", "workers", THINKING_LEVELS),
     sessionRef: readNullableString(row, "session_ref", "workers"),
     createdAt: readString(row, "created_at", "workers"),
     latestRunSeq: readInteger(row, "latest_run_seq", "workers"),
+  };
+}
+
+export function mapWorkerFactRow(row: Record<string, unknown>): WorkerFact {
+  return {
+    workerId: readString(row, "id", "workers"),
+    createdAt: readString(row, "created_at", "workers"),
+    projectKey: readString(row, "project_key", "workers"),
+    role: readString(row, "role", "workers"),
+    channel: readNullableString(row, "channel", "workers"),
+    modelName: readNullableString(row, "model_name", "workers"),
+  };
+}
+
+export function mapRunFactRow(row: Record<string, unknown>): RunFact {
+  return {
+    runId: readString(row, "id", "runs"),
+    workerId: readString(row, "worker_id", "runs"),
+    startedAt: readString(row, "started_at", "runs"),
+    endedAt: readNullableString(row, "ended_at", "runs"),
+    runMs: readNullableInteger(row, "run_ms", "runs"),
+    inputTokens: readNonNegativeNumber(row, "input_tokens", "runs"),
+    outputTokens: readNonNegativeNumber(row, "output_tokens", "runs"),
+    cacheReadTokens: readNonNegativeNumber(row, "cache_read_tokens", "runs"),
+    cacheWriteTokens: readNonNegativeNumber(row, "cache_write_tokens", "runs"),
+    totalTokens: readNonNegativeNumber(row, "total_tokens", "runs"),
+    costUsd: readNullableNumber(row, "cost_usd", "runs"),
   };
 }
 
@@ -252,7 +279,8 @@ export function mapRunRow(row: Record<string, unknown>): RunRecord {
     spawnedAt: readNullableString(row, "spawned_at", "runs"),
     exitCode: readNullableInteger(row, "exit_code", "runs"),
     killedBy: readNullableEnum(row, "killed_by", "runs", KILLED_BY_VALUES),
-    usage: readUsage(row, "usage_json", "runs"),
+    usage: readUsage(row, "runs"),
+    runMs: readNullableInteger(row, "run_ms", "runs"),
     retry: readRetry(row, "retry_json", "runs"),
     activity: readNullableString(row, "activity", "runs"),
     lastActivityAt: readNullableString(row, "last_activity_at", "runs"),

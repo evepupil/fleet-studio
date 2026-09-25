@@ -3,12 +3,15 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveStaticTarget } from "../../src/http/static.js";
+import { injectDashboardToken, resolveStaticTarget } from "../../src/http/static.js";
 import { startTestServer, type TestServer } from "./testServer.js";
 
 function createWebDist(): string {
   const dir = mkdtempSync(join(tmpdir(), "fleet-http-static-"));
-  writeFileSync(join(dir, "index.html"), "<!doctype html><title>看板</title>");
+  writeFileSync(
+    join(dir, "index.html"),
+    "<!doctype html><html><head><title>看板</title></head><body>看板</body></html>",
+  );
   mkdirSync(join(dir, "assets"));
   writeFileSync(join(dir, "assets", "app.js"), "console.log('app')");
   return dir;
@@ -87,6 +90,47 @@ describe("看板静态文件", () => {
 
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("pnpm build");
+  });
+
+  it("index.html 和前端路由的 HTML 里都带看板令牌 meta", async () => {
+    server = await startTestServer(createWebDist());
+
+    const expected = `<meta name="fleet-dashboard-token" content="${server.dashboardToken}">`;
+    const root = await (await fetch(`${server.baseUrl}/`)).text();
+    const frontendRoute = await (await fetch(`${server.baseUrl}/workers/w7k2mq`)).text();
+
+    expect(root).toContain(expected);
+    expect(frontendRoute).toContain(expected);
+    // 必须插在 </head> 之前，浏览器解析时才在 head 里。
+    expect(root.indexOf(expected)).toBeLessThan(root.indexOf("</head>"));
+  });
+
+  it("assets/ 下的文件原样返回，不会被注入令牌", async () => {
+    server = await startTestServer(createWebDist());
+
+    const res = await fetch(`${server.baseUrl}/assets/app.js`);
+    const body = await res.text();
+
+    expect(body).toBe("console.log('app')");
+    expect(body).not.toContain(server.dashboardToken);
+  });
+});
+
+describe("injectDashboardToken（纯函数，直接测注入规则）", () => {
+  const token = "deadbeef";
+
+  it("插在 </head> 之前", () => {
+    const html = injectDashboardToken(
+      "<html><head><title>t</title></head><body></body></html>",
+      token,
+    );
+    expect(html).toContain(`<meta name="fleet-dashboard-token" content="${token}">`);
+    expect(html.indexOf("</head>")).toBeGreaterThan(html.indexOf(token));
+  });
+
+  it("没有 </head> 时插到文件开头", () => {
+    const html = injectDashboardToken("<title>看板</title>", token);
+    expect(html.startsWith(`<meta name="fleet-dashboard-token" content="${token}">`)).toBe(true);
   });
 });
 

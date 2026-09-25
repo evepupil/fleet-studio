@@ -3,10 +3,15 @@ import type {
   ListWorkersQuery,
   PoolPatch,
   PoolView,
+  ProjectInfo,
   RoleView,
   SendRequest,
   Snapshot,
+  StatsQuery,
+  StatsResponse,
   SubmitRequest,
+  TaskPage,
+  TasksQuery,
   TimelineEvent,
   TimelinePage,
   WaitResult,
@@ -53,8 +58,22 @@ export interface FleetService {
     timeoutMs: number,
     signal: AbortSignal,
   ): Promise<WaitResult>;
+  /** 按派活优先级排列 */
   pools(): PoolView[];
   patchPool(id: string, patch: PoolPatch): Promise<PoolView>;
+  /** 启用或停用一个池，写回配置；池不存在抛 not_found。返回改后的池视图 */
+  setPoolEnabled(id: string, enabled: boolean): Promise<PoolView>;
+  /**
+   * 按给出的顺序重排全部池，写回配置；poolIds 不是当前全部池编号的一个排列时抛 FleetError("conflict")。
+   * 返回改后按新顺序排列的全部池视图
+   */
+  reorderPools(poolIds: readonly string[]): Promise<PoolView[]>;
+  /** 总览统计；custom 范围的日期不合法由请求校验挡住 */
+  stats(query: StatsQuery): StatsResponse;
+  /** 任务列表的一页；cursor 解不开抛 FleetError("invalid_request") */
+  tasks(query: TasksQuery): TaskPage;
+  /** 全部项目，按名字排序 */
+  projects(): ProjectInfo[];
   roles(): RoleView[];
   /** 订阅事件，返回取消订阅函数 */
   subscribe(listener: (event: ServiceEvent) => void): () => void;
