@@ -1,6 +1,6 @@
 # 接入层 · skill 与苦工提示词
 
-> 模块定位：注入模型上下文的两类规矩——教主会话怎么谈设计、怎么经 fleet 派活的六份 skill，和苦工的六个角色提示词；以及把它们装进宿主的脚本 · 对应代码：`skills/`、`roles/`、`scripts/install-skills.mjs`、`scripts/install-roles.mjs`、`packages/cli/test/skills.test.ts` · 所属里程碑：[M4 fleet 系列 skill 与苦工提示词](../roadmap.md#m4) · 状态：进行中（skill 已装到 Claude Code、苦工提示词已切到仓库，等用户试用；Codex 未装新 skill，旧的 oc-fleet 已挪进备份）· 最近更新：2026-09-25
+> 模块定位：注入模型上下文的两类规矩——教主会话怎么谈设计、怎么经 fleet 派活的六份 skill，和苦工的六个角色提示词；以及把它们装进宿主的脚本 · 对应代码：`skills/`、`roles/`、`scripts/install-skills.mjs`、`scripts/install-roles.mjs`、`packages/cli/test/skills.test.ts` · 所属里程碑：[M4 fleet 系列 skill 与苦工提示词](../roadmap.md#m4) · 状态：进行中（skill 已装到 Claude Code、苦工提示词已切到仓库，等用户试用；2026-09-25 已装到 Codex，等在 Codex 里实测）· 最近更新：2026-09-25
 
 ## 1. 职责与边界
 
@@ -85,7 +85,7 @@ fleet-ops（通道和运行时，维护时用）
 
 - 六份 skill 的正文。fleet-discuss 附五份参考：各类设计文档的格式、功能发散维度、常见页面、常见区块、前端定方向的做法。fleet-project-build 补上代码与文档规矩（严格模式、按职责拆目录、核心逻辑必须单测、模块文档同步、roadmap 完成的依据）；fleet-ui-build 补上界面实现与文案的硬规矩。fleet-ui-build 带上原 ui-build 的参考、模板和六个验收工具。相对旧版的改动：派活处都指向 fleet 命令；修复任务书的回报格式对齐修复角色；截图工具关浏览器时按进程树整棵结束（搬了本仓库截图脚本 2026-09-24 的修法，旧版只结束主进程，会留下孤儿进程占着档案目录）；工具代码按本仓库的格式规则整理过。
 - 六份角色提示词在 `roles/`；默认配置的六个角色都写成 `builtin:roles/<角色>.md`。本机已有的 `~/.fleet-studio/config.json` 同样改好，改之前的原样备份在 `config.json.bak-20260924-roles`。
-- 本机配置的池只配 pi（撤掉 opencode 前的备份 `config.json.bak-20260924-no-opencode`），收集角色已加（加之前的备份 `config.json.bak-20260924-collector`）。Codex 的旧 oc-fleet 在 `~/.fleet-studio/skill-backup/2026-09-24T08-08-37-887Z/codex/`，`node scripts/install-skills.mjs --uninstall --target codex` 可挪回。
+- 本机配置的池只配 pi（撤掉 opencode 前的备份 `config.json.bak-20260924-no-opencode`），收集角色已加（加之前的备份 `config.json.bak-20260924-collector`）。Codex 已装六份新 skill（2026-09-25）；旧的 pi-fleet、fleet-build、auto-delegate 在 `~/.fleet-studio/skill-backup/2026-09-25T06-45-28-087Z/codex/`，更早挪走的 oc-fleet 在 `~/.fleet-studio/skill-backup/2026-09-24T08-08-37-887Z/codex/`，`node scripts/install-skills.mjs --uninstall --target codex` 挪回最近一次。
 - `scripts/install-skills.mjs`：默认装 Claude Code，`--target codex|all` 装 Codex 或两边；`--check` 只报告差异，有差异退出码 1；`--uninstall` 删掉本脚本装的、挪回最近一次备份的旧 skill。退役名单：pi-fleet、oc-fleet、fleet-build、ui-build、auto-delegate。宿主目录认 `CLAUDE_CONFIG_DIR`、`CODEX_HOME`，备份目录认 `FLEET_HOME`。
 - `scripts/install-roles.mjs`：一条命令同步两处：生成 opencode 的三个 agent，把全部提示词原样复制到 pi 的角色目录；`--check`、`--uninstall` 同上，只处理仓库里有的角色，目录里别的文件不动。agent 目录认 `XDG_CONFIG_HOME`。开头声明里的字符串一律写成 JSON 字符串，它同时是合法的 YAML 写法。
 - `packages/cli/test/skills.test.ts`：6 个测试，从 skill 的代码块和行内代码里取出全部 `fleet <子命令> ...` 用例，逐个对照 `fleet --help`、`fleet <子命令> --help` 的输出。`packages/core/test/config/defaults.test.ts` 核对六个角色都指向仓库提示词、文件都在。
@@ -97,11 +97,11 @@ fleet-ops（通道和运行时，维护时用）
 - 两个安装脚本都在临时目录演练过：装之前检查、安装并挪走旧的、装后检查一致、改动后检查报出差异、覆盖重装、卸载并挪回；skill 另验了遇到用户自己的同名目录拒绝安装、非法目标报错。
 - 真实环境：skill 装到 Claude Code 后检查全部一致；opencode agent 生成后 `opencode agent list` 列出实现、侦察、评审三个 agent，侦察的「改文件」权限仍是拒绝；pi 角色目录同步后检查五份和仓库一致；本机服务改完配置后 `fleet roles` 只剩五个角色；经 fleet 派一个真实侦察苦工读仓库文件，9 秒完成，按侦察角色的格式交回回报。收集角色：派一路查两个软件的最新版本号写成 JSON，9 分 11 秒完成，每条带官方出处，日期在几个官方页面对不上的地方写进了 BLOCKED；再派一路限定必须用搜索工具，21 秒完成（前提是 pi 的联网插件已启用，见 fleet-ops 的 pi 参考）。撤掉池里的 opencode 后，点名 opencode 派活当场报错、退出码 1，不建苦工。
 - 提示词精简前后对比（2026-09-24，新旧两版同时跑同样的活，deepseek-v4.1-flash，推理档位默认）：收集角色难检索（找国考行测常识判断前 5 题和答案）旧版 205、281 秒，新版 78、134 秒，四路答案一致、字段齐全；简单检索（查两个版本号）旧版 157、184、224 秒，新版 66～205 秒，差别在波动范围内，因为网上几个官方来源的日期本身对不上，模型会自己去追查。另外五个角色在一个带已知缺陷的小代码库上各跑新旧两版：都没提交、没越界改文件；评审都抓到埋的错，修复都拒了混进去的误报，测试都没动业务代码并如实报失败；看板的回报解析全部认得出、通过与否判得对；耗时相当（新版侦察有一轮被通道卡了 68 秒，其余每轮 2～5 秒）。同批还碰上通道反复掐断连接，3 路在 pi 连续 3 次重试失败后中途收工，新旧两版都有，和提示词无关。
-- 待做：用户在新会话里实际用一轮；装到 Codex 后实测一次。
+- 待做：用户在新会话里实际用一轮；在 Codex 里实测一次。
 
 ## 6. 待扩展项
 
-- 装到 Codex 并实测（Codex 那边还留着旧的 pi-fleet、fleet-build 和 auto-delegate；oc-fleet 已挪进备份）。
+- 在 Codex 里实测一次（已装，旧的四份都在备份里）。
 - 出厂默认配置的 dsf 池仍带 opencode 的模型：服务层测试拿它当基线，opencode 的续接、接管都靠它测，改掉要连带改一批测试。新装的机器先照 fleet-ops 把池里的 opencode 撤掉；真有第二台机器要装时再改出厂默认。
 - 把 Claude Code 的无头模式接成第三种运行时、开一个强模型池，这样强模型苦工也经过闸门、显示在看板上。属于需求变更。
 - 进度流水将来要给「现状卡」一类汇总用时，可能要把六项固定成可解析的格式。
@@ -120,3 +120,4 @@ fleet-ops（通道和运行时，维护时用）
 | 2026-09-24 | fleet-dispatch 加「探索的活怎么拆」，写代码之外的调研按对象拆成多路并行；fleet-discuss 的调研示例、前端设计参考、界面规格参考同步改成一个站一路 |
 | 2026-09-25 | fleet-discuss 回复格式：字母和「5.1」这类编号的条目每行开头加「- 」，修掉连着几行被显示成一整段的问题 |
 | 2026-09-25 | fleet-dispatch 开头加「拆活由主会话判断，多路同时派，不让一个苦工包圆」，删掉「强模型一路能吃下一整个子系统」 |
+| 2026-09-25 | 六份 skill 装到 Codex，旧的 pi-fleet、fleet-build、auto-delegate 挪进备份；fleet-discuss 写明 Codex 里出图工具叫 g2i、没有 archify 就画文字图 |
