@@ -38,8 +38,8 @@ const CASES = [
       scenario,
       page,
       hash: `#/${page}`,
-      widths: ["1440"],
-      themes: ["light"],
+      widths: WIDTHS.map(({ name }) => name),
+      themes: THEMES,
       ready:
         scenario === "empty"
           ? page === "overview"
@@ -54,8 +54,8 @@ const CASES = [
     scenario,
     page: "overview",
     hash: "#/overview",
-    widths: ["1440"],
-    themes: ["light"],
+    widths: WIDTHS.map(({ name }) => name),
+    themes: THEMES,
     ready:
       scenario === "offline"
         ? `!!document.querySelector('[data-banner="offline"]')`
