@@ -10,30 +10,51 @@ import { fakeOpencodeCommand, fakePiCommand } from "@fleet/testkit";
 
 export const TEST_POOL_ID = "test-pool";
 export const TEST_ROLE_ID = "worker";
+export const PRIORITY_POOL_IDS = { alpha: "pool-alpha", beta: "pool-beta" } as const;
+
+export function buildPriorityTestPools(): FleetConfigInput["pools"] {
+  return [
+    {
+      id: PRIORITY_POOL_IDS.alpha,
+      label: "甲",
+      capacity: 1,
+      runtimes: { pi: { provider: "mcgrox", model: "deepseek-v4.1-flash" } },
+    },
+    {
+      id: PRIORITY_POOL_IDS.beta,
+      label: "乙",
+      capacity: 2,
+      runtimes: { pi: { provider: "mcgrox", model: "deepseek-v4.1-flash" } },
+    },
+  ];
+}
 
 export interface TestConfigOptions {
   /** 池容量；调整容量的测试会在起服务后再 PATCH 它 */
   capacity: number;
   /** 单项目在池里的上限；不传则不限 */
   perProjectCap?: number | null;
+  /** 多池调度测试可覆盖默认单池配置 */
+  pools?: FleetConfigInput["pools"];
 }
 
 export function buildTestConfig(options: TestConfigOptions): FleetConfigInput {
+  const pools = options.pools ?? [
+    {
+      id: TEST_POOL_ID,
+      label: "测试池",
+      capacity: options.capacity,
+      perProjectCap: options.perProjectCap ?? null,
+      runtimes: {
+        pi: { provider: "mcgrox", model: "deepseek-v4.1-flash" },
+        opencode: { model: "mcgrox/deepseek-v4.1-flash" },
+      },
+    },
+  ];
   return {
     version: 1,
-    defaults: { pool: TEST_POOL_ID, role: TEST_ROLE_ID },
-    pools: [
-      {
-        id: TEST_POOL_ID,
-        label: "测试池",
-        capacity: options.capacity,
-        perProjectCap: options.perProjectCap ?? null,
-        runtimes: {
-          pi: { provider: "mcgrox", model: "deepseek-v4.1-flash" },
-          opencode: { model: "mcgrox/deepseek-v4.1-flash" },
-        },
-      },
-    ],
+    defaults: { pool: pools[0]?.id ?? TEST_POOL_ID, role: TEST_ROLE_ID },
+    pools,
     roles: [{ id: TEST_ROLE_ID, label: "苦工" }],
     runtimes: {
       pi: { command: fakePiCommand() },

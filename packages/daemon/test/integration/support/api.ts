@@ -120,6 +120,28 @@ export async function patchPool(
   return { status: response.status, body };
 }
 
+/** PUT /api/pools/:id/enabled */
+export async function setPoolEnabled(harness: Harness, poolId: string, enabled: boolean) {
+  const response = await harness.fetchWithToken(API_PATHS.poolEnabled(poolId), {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  const body = await readJsonBody(response);
+  return { status: response.status, body };
+}
+
+/** PUT /api/pools/order */
+export async function reorderPools(harness: Harness, poolIds: readonly string[]) {
+  const response = await harness.fetchWithToken(API_PATHS.poolOrder, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ poolIds }),
+  });
+  const body = await readJsonBody(response);
+  return { status: response.status, body };
+}
+
 /** GET /api/pools */
 export async function getPools(harness: Harness) {
   const response = await harness.fetch(API_PATHS.pools);
