@@ -1,6 +1,6 @@
 # 接入层 · skill 与苦工提示词
 
-> 模块定位：注入模型上下文的两类规矩——教主会话怎么谈设计、怎么经 fleet 派活的六份 skill，和苦工的六个角色提示词；以及把它们装进宿主的脚本 · 对应代码：`skills/`、`roles/`、`scripts/install-skills.mjs`、`scripts/install-roles.mjs`、`packages/cli/test/skills.test.ts` · 所属里程碑：[M4 fleet 系列 skill 与苦工提示词](../roadmap.md#m4) · 状态：进行中（skill 已装到 Claude Code、苦工提示词已切到仓库，等用户试用；Codex 未装新 skill，旧的 oc-fleet 已挪进备份）· 最近更新：2026-09-24
+> 模块定位：注入模型上下文的两类规矩——教主会话怎么谈设计、怎么经 fleet 派活的六份 skill，和苦工的六个角色提示词；以及把它们装进宿主的脚本 · 对应代码：`skills/`、`roles/`、`scripts/install-skills.mjs`、`scripts/install-roles.mjs`、`packages/cli/test/skills.test.ts` · 所属里程碑：[M4 fleet 系列 skill 与苦工提示词](../roadmap.md#m4) · 状态：进行中（skill 已装到 Claude Code、苦工提示词已切到仓库，等用户试用；Codex 未装新 skill，旧的 oc-fleet 已挪进备份）· 最近更新：2026-09-25
 
 ## 1. 职责与边界
 
@@ -117,3 +117,4 @@ fleet-ops（通道和运行时，维护时用）
 | 2026-09-24 | 苦工一律用 pi：fleet-dispatch 写死不许指定 opencode；本机池配置撤掉 opencode 的模型，点名当场被拒；Codex 的旧 oc-fleet 挪进备份；fleet-ops 的运行时说明和 opencode 参考跟着改 |
 | 2026-09-24 | 六个角色的提示词精简成「一句话职责、限制、回报格式」三段，做法类要求交给任务书；fleet-ops 写明这条规矩，fleet-dispatch 提醒任务书别堆用不着的做法要求 |
 | 2026-09-24 | fleet-dispatch 加「探索的活怎么拆」，写代码之外的调研按对象拆成多路并行；fleet-discuss 的调研示例、前端设计参考、界面规格参考同步改成一个站一路 |
+| 2026-09-25 | fleet-discuss 回复格式：字母和「5.1」这类编号的条目每行开头加「- 」，修掉连着几行被显示成一整段的问题 |
