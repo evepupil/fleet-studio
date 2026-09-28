@@ -1,6 +1,6 @@
 # 接入层 · skill 与苦工提示词
 
-> 模块定位：注入模型上下文的两类规矩——教主会话怎么谈设计、怎么经 fleet 派活的六份 skill，和苦工的六个角色提示词；以及把它们装进宿主的脚本 · 对应代码：`skills/`、`roles/`、`scripts/install-skills.mjs`、`scripts/install-roles.mjs`、`packages/cli/test/skills.test.ts` · 所属里程碑：[M4 fleet 系列 skill 与苦工提示词](../roadmap.md#m4)、[M5 第二版底座](../roadmap.md#m5) · 状态：进行中（skill 已装到 Claude Code、苦工提示词已切到仓库，等用户试用；2026-09-25 已装到 Codex，等在 Codex 里实测）· 最近更新：2026-09-25
+> 模块定位：注入模型上下文的两类规矩——教主会话怎么谈设计、怎么经 fleet 派活的六份 skill，和苦工的六个角色提示词；以及把它们装进宿主的脚本 · 对应代码：`skills/`、`roles/`、`scripts/install-skills.mjs`、`scripts/install-roles.mjs`、`packages/cli/test/skills.test.ts` · 所属里程碑：[M4 fleet 系列 skill 与苦工提示词](../roadmap.md#m4)、[M5 第二版底座](../roadmap.md#m5) · 状态：进行中（skill 已装到 Claude Code、苦工提示词已切到仓库，等用户试用；2026-09-25 已装到 Codex，等在 Codex 里实测）· 最近更新：2026-09-28
 
 ## 1. 职责与边界
 
@@ -142,3 +142,4 @@ fleet-ops（通道和运行时，维护时用）
 | 2026-09-25 | fleet-dispatch 开头加「拆活由主会话判断，多路同时派，不让一个苦工包圆」，删掉「强模型一路能吃下一整个子系统」 |
 | 2026-09-25 | 六份 skill 装到 Codex，旧的 pi-fleet、fleet-build、auto-delegate 挪进备份；fleet-discuss 写明 Codex 里出图工具叫 g2i、没有 archify 就画文字图 |
 | 2026-09-25 | 第二版：fleet-dispatch、fleet-ops、fleet-ui-build 去掉默认池说法，写明优先级、停用、公共排队和只清理原始输出 |
+| 2026-09-28 | 去掉三处引导写死断言的地方：需求设计模板的「这一版不做什么」一节、界面规格参考和模板里「资料站明确写不做滚动入场、不做数字滚动」的要求、fleet-discuss 里「没有 archify 就只画文字图」 |
