@@ -22,8 +22,8 @@ describe("runOpenCommand", () => {
     expect(exitCode).toBe(EXIT_CODE.ok);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.command).toBe("rundll32");
-    // 默认进总览页（规格第二版 4）。
-    const url = `${harness.stub.baseUrl}/#/overview`;
+    // 默认进任务看板（第三版首页）。
+    const url = `${harness.stub.baseUrl}/#/tasks`;
     expect(calls[0]?.args).toEqual(["url.dll,FileProtocolHandler", url]);
     expect(harness.deps.stdoutLines).toContain(`已打开 ${url}`);
   });
