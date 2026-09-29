@@ -65,6 +65,7 @@ export async function launchBrowser(port) {
   });
   let nextId = 1;
   const pending = new Map();
+  const pageErrors = [];
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(String(event.data));
     if (message.id !== undefined && pending.has(message.id)) {
@@ -72,6 +73,18 @@ export async function launchBrowser(port) {
       pending.delete(message.id);
       if (message.error) reject(new Error(message.error.message));
       else resolve(message.result);
+      return;
+    }
+    if (message.method === "Runtime.exceptionThrown") {
+      const details = message.params.exceptionDetails;
+      pageErrors.push(
+        `运行时异常：${details.exception?.description ?? details.text ?? "未知异常"}`,
+      );
+    } else if (message.method === "Runtime.consoleAPICalled" && message.params.type === "error") {
+      const text = message.params.args
+        .map((arg) => arg.value ?? arg.description ?? arg.type)
+        .join(" ");
+      pageErrors.push(`console.error：${text}`);
     }
   });
   const rpc = (method, params = {}) =>
@@ -118,15 +131,53 @@ export async function launchBrowser(port) {
         Escape: { code: "Escape", windowsVirtualKeyCode: 27 },
         ArrowDown: { code: "ArrowDown", windowsVirtualKeyCode: 40 },
         ArrowUp: { code: "ArrowUp", windowsVirtualKeyCode: 38 },
-      }[key];
-      if (!keyData) throw new Error(`不支持的按键：${key}`);
+        ArrowLeft: { code: "ArrowLeft", windowsVirtualKeyCode: 37 },
+        ArrowRight: { code: "ArrowRight", windowsVirtualKeyCode: 39 },
+      };
+      const parts = key.split("+");
+      const baseKey = parts.at(-1);
+      let modifiers = 0;
+      for (const modifier of parts.slice(0, -1)) {
+        if (modifier === "Control" || modifier === "Ctrl") modifiers |= 2;
+        else if (modifier === "Alt") modifiers |= 1;
+        else if (modifier === "Shift") modifiers |= 8;
+        else if (modifier === "Meta" || modifier === "Command") modifiers |= 4;
+        else throw new Error(`不支持的修饰键：${modifier}`);
+      }
+      const data =
+        keyData[baseKey] ??
+        (/^[a-z]$/i.test(baseKey ?? "")
+          ? {
+              code: `Key${baseKey.toUpperCase()}`,
+              windowsVirtualKeyCode: baseKey.toUpperCase().charCodeAt(0),
+            }
+          : null);
+      if (!data) throw new Error(`不支持的按键：${key}`);
+      const keyValue = /^[a-z]$/i.test(baseKey) ? baseKey.toLowerCase() : baseKey;
       await rpc("Input.dispatchKeyEvent", {
         type: "keyDown",
-        key,
-        ...keyData,
-        ...(key === "Enter" ? { text: "\r", unmodifiedText: "\r" } : {}),
+        key: keyValue,
+        ...data,
+        ...(modifiers ? { modifiers } : {}),
+        ...(baseKey === "Enter" ? { text: "\r", unmodifiedText: "\r" } : {}),
       });
-      await rpc("Input.dispatchKeyEvent", { type: "keyUp", key, ...keyData });
+      await rpc("Input.dispatchKeyEvent", {
+        type: "keyUp",
+        key: keyValue,
+        ...data,
+        ...(modifiers ? { modifiers } : {}),
+      });
+    },
+    async typeText(text) {
+      for (const character of text) {
+        await rpc("Input.insertText", { text: character });
+      }
+    },
+    clearPageErrors() {
+      pageErrors.length = 0;
+    },
+    takePageErrors() {
+      return pageErrors.splice(0);
     },
     async waitFor(expression, timeoutMs = 3000, intervalMs = 50) {
       const deadline = Date.now() + timeoutMs;

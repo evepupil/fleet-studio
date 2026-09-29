@@ -41,13 +41,39 @@ export async function clickElement(browser, expression) {
   });
 }
 
+export async function hoverElement(browser, expression) {
+  const point = await browser.evaluate(`(() => {
+    const element = (${expression});
+    if (!element) throw new Error("找不到要悬停的元素");
+    const rect = element.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    if (rect.width <= 0 || rect.height <= 0 || x < 0 || y < 0 ||
+        x >= innerWidth || y >= innerHeight) {
+      throw new Error("元素不在可悬停区域：" + JSON.stringify(rect.toJSON()));
+    }
+    if (!element.contains(document.elementFromPoint(x, y))) {
+      throw new Error("元素被遮挡：" + element.textContent.trim());
+    }
+    return { x, y };
+  })()`);
+  await browser.rpc("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
+}
+
+export async function clickMenuItem(browser, expression) {
+  if (!(await browser.waitFor("!!document.querySelector('[role=\"menu\"]')"))) {
+    throw new Error("菜单未打开");
+  }
+  await clickElement(browser, expression);
+}
+
 export async function chooseSelectOption(browser, selector, label) {
   await clickElement(browser, `document.querySelector(${JSON.stringify(selector)})`);
   if (!(await browser.waitFor("!!document.querySelector('[role=\"listbox\"]')"))) {
     throw new Error(`下拉菜单未打开：${selector}`);
   }
   const option = `[...document.querySelectorAll('[role="option"]')]
-    .find((element) => element.textContent.trim() === ${JSON.stringify(label)})`;
+    .find((element) => element.textContent.replace(/\\s+/g, "") === ${JSON.stringify(label.replace(/\s+/g, ""))})`;
   // 已选项靠近顶部时菜单会内部滚动；先确认菜单在屏内，再滚到要选的项。
   const visible = await browser.waitFor(`(() => {
     const rect = document.querySelector('[role="listbox"]')?.getBoundingClientRect();
