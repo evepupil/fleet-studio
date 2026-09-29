@@ -1672,6 +1672,32 @@ try {
   );
 
   await check(
+    "总览：悬停 token 趋势时提示卡每行都带系列名",
+    "busy",
+    "#/overview",
+    async () => {
+      await waitFor(`!!${q("[data-token-trend] .recharts-surface")}`, "趋势图加载");
+      await browser.evaluate(`${q("[data-token-trend]")}.scrollIntoView({ block: "center" })`);
+      const point = await browser.evaluate(`(() => {
+      const rect = ${q("[data-token-trend] .recharts-surface")}.getBoundingClientRect();
+      return { x: Math.round(rect.left + rect.width * 0.55), y: Math.round(rect.top + rect.height * 0.5) };
+    })()`);
+      await browser.rpc("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
+      await waitFor(
+        `!!${q("[data-token-trend] .recharts-tooltip-wrapper")}?.textContent.includes("deepseek-v4.1-flash")`,
+        "趋势提示卡出现",
+      );
+      // 图例里的每个系列名都要出现在提示卡里，不能只剩数字
+      return browser.evaluate(`(() => {
+      const tip = ${q("[data-token-trend] .recharts-tooltip-wrapper")}?.textContent ?? "";
+      const names = [...${q("[data-token-trend]")}.querySelectorAll("[data-legend]")].map((item) => item.textContent.trim());
+      return names.length > 0 && names.every((name) => tip.includes(name));
+    })()`);
+    },
+    true,
+  );
+
+  await check(
     "总览：empty 场景统计空态且四项实时值全为 0",
     "empty",
     "#/overview",

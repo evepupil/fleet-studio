@@ -2,6 +2,7 @@ import type { StatsDimension, TrendSeries } from "@fleet/core";
 import { useState } from "react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { useStats } from "@/api/queries";
+import { ColorDot } from "@/components/ColorDot";
 import { DimensionTabs } from "@/components/DimensionTabs";
 import { Panel } from "@/components/Panel";
 import { SeriesLegend } from "@/components/SeriesLegend";
@@ -133,7 +134,16 @@ function TokenTrendCard() {
                     content={
                       <ChartTooltipContent
                         labelFormatter={(value) => formatBucketTitle(String(value), granularity)}
-                        formatter={(value) => formatTokens(Number(value))}
+                        // 自定义格式化会替换整行，所以色点和名称要自己画，否则只剩一串数字分不清谁是谁
+                        formatter={(value, name, item) => (
+                          <div className="flex w-full min-w-[160px] items-center gap-2">
+                            <ColorDot colorVar={item.color ?? "var(--series-other)"} size={8} />
+                            <span className="min-w-0 truncate text-fg-2">{String(name)}</span>
+                            <span className="ml-auto font-mono font-medium tabular-nums text-fg-1">
+                              {formatTokens(Number(value))}
+                            </span>
+                          </div>
+                        )}
                       />
                     }
                   />
