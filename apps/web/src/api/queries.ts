@@ -15,6 +15,7 @@ import { activitySignature } from "@/lib/activity";
 import { useSnapshotStore } from "@/state/snapshotStore";
 
 export const DataSourceContext = createContext<DataSource | null>(null);
+const INITIAL_TASK_CURSOR: string | undefined = undefined;
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,7 +53,7 @@ export function useTasks(query: Omit<TasksQuery, "cursor">) {
         ...query,
         ...(pageParam === undefined ? {} : { cursor: pageParam }),
       }),
-    initialPageParam: undefined as string | undefined,
+    initialPageParam: INITIAL_TASK_CURSOR,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
 }
@@ -84,6 +85,26 @@ export function useReorderPools() {
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "调整模型池顺序失败");
     },
+  });
+}
+
+export function useTaskSearch(query: string) {
+  const dataSource = useDataSource();
+  const q = query.trim();
+  return useQuery({
+    queryKey: ["search", q],
+    queryFn: () =>
+      dataSource.getTasks({
+        range: "all",
+        status: "all",
+        q,
+        sort: "createdAt",
+        order: "desc",
+        limit: 8,
+      }),
+    enabled: q.length > 0,
+    staleTime: 5000,
+    placeholderData: keepPreviousData,
   });
 }
 

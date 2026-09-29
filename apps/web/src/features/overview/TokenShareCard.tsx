@@ -5,7 +5,7 @@ import { useStats } from "@/api/queries";
 import { ColorDot } from "@/components/ColorDot";
 import { DimensionTabs } from "@/components/DimensionTabs";
 import { EmptyState } from "@/components/EmptyState";
-import { SectionCard } from "@/components/SectionCard";
+import { Panel } from "@/components/Panel";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -29,10 +29,11 @@ const DIMENSION_LABELS: Record<StatsDimension, string> = {
   role: "角色",
 };
 
+/** 「其他」行不可点、名字用次要色：完整类名映射，避免拼接类名。 */
 const SHARE_ROW_CLASSES = {
   interactive:
-    "cursor-pointer hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
-  other: "hover:bg-transparent",
+    "h-8 cursor-pointer hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+  other: "h-8 hover:bg-transparent",
 };
 
 const SHARE_LABEL_CLASSES = {
@@ -79,12 +80,12 @@ function TokenShareCard() {
       range: overviewState.range,
       ...dimensionFilter(overviewState.dimension, item.key),
     });
-    navigate("/tasks");
+    navigate("/tasks/list");
   }
 
   return (
     <div data-token-share className="h-full min-w-0">
-      <SectionCard
+      <Panel
         data-section="token-share"
         title="token 分布"
         className="h-full"
@@ -94,7 +95,7 @@ function TokenShareCard() {
       >
         {loading ? (
           <div className="grid min-w-0 grid-cols-1 items-center gap-6 md:grid-cols-[160px_minmax(0,1fr)]">
-            <Skeleton className="h-40 w-40 justify-self-center rounded-full" />
+            <Skeleton className="size-40 justify-self-center rounded-full" />
             <div className="space-y-2">
               {["one", "two", "three", "four", "five"].map((key) => (
                 <Skeleton key={key} className="h-5 w-full" />
@@ -108,9 +109,9 @@ function TokenShareCard() {
             <div
               role="img"
               aria-label={`token 分布，按${DIMENSION_LABELS[overviewState.dimension]}，共 ${items.length} 项`}
-              className="relative h-40 w-40 shrink-0 justify-self-center"
+              className="relative size-40 shrink-0 justify-self-center"
             >
-              <ChartContainer config={chartConfig} className="h-40 w-40 aspect-square">
+              <ChartContainer config={chartConfig} className="size-40">
                 <PieChart>
                   <ChartTooltip
                     content={
@@ -134,7 +135,7 @@ function TokenShareCard() {
                     innerRadius={52}
                     outerRadius={80}
                     paddingAngle={0}
-                    stroke="var(--bg-panel)"
+                    stroke="var(--bg-card)"
                     strokeWidth={2}
                     isAnimationActive={false}
                   >
@@ -148,26 +149,28 @@ function TokenShareCard() {
                 </PieChart>
               </ChartContainer>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-mono text-22 font-semibold text-fg-1">
+                <span className="font-mono text-16 font-medium text-fg-1">
                   {formatTokens(totalTokens)}
                 </span>
-                <span className="text-11 text-fg-3">tokens</span>
+                <span className="text-12 text-fg-3">tokens</span>
               </div>
             </div>
-            <Table data-share-table className="table-fixed w-full text-13">
+            <Table data-share-table className="table-fixed w-full">
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-12 font-medium text-fg-3">
-                    {DIMENSION_LABELS[overviewState.dimension]}
+                  <TableHead>
+                    <span className="text-12 font-medium text-fg-3">
+                      {DIMENSION_LABELS[overviewState.dimension]}
+                    </span>
                   </TableHead>
-                  <TableHead className="w-16 text-right text-12 font-medium text-fg-3">
-                    任务数
+                  <TableHead className="w-16 text-right">
+                    <span className="text-12 font-medium text-fg-3">任务数</span>
                   </TableHead>
-                  <TableHead className="w-20 text-right text-12 font-medium text-fg-3">
-                    token
+                  <TableHead className="w-20 text-right">
+                    <span className="text-12 font-medium text-fg-3">token</span>
                   </TableHead>
-                  <TableHead className="hidden w-14 text-right text-12 font-medium text-fg-3 xl:table-cell">
-                    占比
+                  <TableHead className="hidden w-14 text-right 2xl:table-cell">
+                    <span className="text-12 font-medium text-fg-3">占比</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -199,19 +202,21 @@ function TokenShareCard() {
                         <ColorDot colorVar={seriesColorVar(item.colorIndex)} />
                         <span
                           title={item.label}
-                          className={`min-w-0 truncate ${item.isOther ? SHARE_LABEL_CLASSES.other : SHARE_LABEL_CLASSES.normal}`}
+                          className={`min-w-0 truncate ${
+                            item.isOther ? SHARE_LABEL_CLASSES.other : SHARE_LABEL_CLASSES.normal
+                          }`}
                         >
                           {item.label}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="w-16 text-right font-mono tabular-nums">
+                    <TableCell className="w-16 text-right font-mono text-12 tabular-nums">
                       {formatCompact(item.tasks)}
                     </TableCell>
-                    <TableCell className="w-20 text-right font-mono tabular-nums">
+                    <TableCell className="w-20 text-right font-mono text-12 tabular-nums">
                       {formatTokens(item.tokens)}
                     </TableCell>
-                    <TableCell className="hidden w-14 text-right font-mono tabular-nums text-fg-2 xl:table-cell">
+                    <TableCell className="hidden w-14 text-right font-mono text-12 tabular-nums text-fg-2 2xl:table-cell">
                       {formatPercent(item.tokens, totalTokens) ?? "—"}
                     </TableCell>
                   </TableRow>
@@ -220,7 +225,7 @@ function TokenShareCard() {
             </Table>
           </div>
         )}
-      </SectionCard>
+      </Panel>
     </div>
   );
 }

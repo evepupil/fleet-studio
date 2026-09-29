@@ -2,6 +2,7 @@ import { createHashRouter, Navigate, useParams } from "react-router";
 import { AppShell } from "@/app/AppShell";
 import { OverviewPage } from "@/pages/OverviewPage";
 import { SlotsPage } from "@/pages/SlotsPage";
+import { TaskDetailPage } from "@/pages/TaskDetailPage";
 import { TasksPage } from "@/pages/TasksPage";
 
 function LegacyWorkerRedirect() {
@@ -15,13 +16,14 @@ function createAppRouter() {
       path: "/",
       element: <AppShell />,
       children: [
-        { index: true, element: <Navigate to="/overview" replace /> },
-        { path: "overview", element: <OverviewPage /> },
+        { index: true, element: <Navigate to="/tasks" replace /> },
+        { path: "tasks", element: <TasksPage view="board" /> },
+        { path: "tasks/list", element: <TasksPage view="list" /> },
+        { path: "tasks/:id", element: <TaskDetailPage /> },
         { path: "slots", element: <SlotsPage /> },
-        { path: "tasks", element: <TasksPage /> },
-        { path: "tasks/:id", element: <TasksPage /> },
+        { path: "overview", element: <OverviewPage /> },
         { path: "w/:id", element: <LegacyWorkerRedirect /> },
-        { path: "*", element: <Navigate to="/overview" replace /> },
+        { path: "*", element: <Navigate to="/tasks" replace /> },
       ],
     },
   ]);

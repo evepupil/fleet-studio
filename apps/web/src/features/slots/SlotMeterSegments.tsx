@@ -60,7 +60,7 @@ function SlotMeterSegments({ segments, capacity, projectByKey }: SlotMeterSegmen
                   <ColorDot colorVar={colorVar} />
                   {projectName}
                 </div>
-                <div className="text-11 text-fg-3">{count} 个</div>
+                <div className="text-12 text-fg-3">{count} 个</div>
               </div>
             </TooltipContent>
           </Tooltip>

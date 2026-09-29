@@ -8,19 +8,19 @@ interface ErrorStateProps {
 
 function ErrorState({ message, onRetry }: ErrorStateProps) {
   return (
-    <div
+    <section
       data-error
       role="alert"
-      className="flex flex-col items-center justify-center gap-2 py-12 text-center"
+      className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center"
     >
-      <TriangleAlert aria-hidden="true" className="size-5 text-status-warning" />
+      <TriangleAlert aria-hidden="true" className="size-4 text-status-warning" />
       <p className="text-13 text-fg-2">加载失败：{message}</p>
       {onRetry ? (
-        <Button type="button" variant="link" onClick={onRetry} className="text-brand">
+        <Button type="button" variant="link" size="sm" onClick={onRetry}>
           重试
         </Button>
       ) : null}
-    </div>
+    </section>
   );
 }
 

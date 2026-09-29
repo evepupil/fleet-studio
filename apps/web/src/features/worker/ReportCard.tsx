@@ -60,7 +60,7 @@ function ClampedText({ content, maxLines, textClassName }: ClampedTextProps) {
       {overflowing && (
         <button
           type="button"
-          className="mt-1 text-12 text-brand hover:underline"
+          className="mt-1 text-12 text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           onClick={() => setExpanded((value) => !value)}
         >
           {expanded ? "收起" : "展开全部"}
@@ -76,55 +76,53 @@ export function ReportCard({ run, runCount }: ReportCardProps) {
   const headerVerdict = report?.verdict ?? null;
 
   return (
-    <section data-report className="mt-4 rounded-lg border border-line bg-raised px-4 py-3.5">
-      <div className="flex items-center gap-2">
-        <span className="text-14 font-semibold text-fg-1">回报</span>
+    <section data-report className="mt-6 rounded-lg border border-line bg-card shadow-card">
+      <header className="flex h-10 items-center gap-2 border-b border-line px-4">
+        <h2 className="text-13 font-medium text-fg-1">回报</h2>
         {headerVerdict !== null && <VerdictTag verdict={headerVerdict} />}
-        {runCount > 1 && <span className="ml-auto text-11 text-fg-3">第 {run.seq} 次运行</span>}
-      </div>
-      {report !== null && (
-        <dl className="mt-3 grid grid-cols-[112px_minmax(0,1fr)] gap-x-3 gap-y-2.5">
-          {report.sections.map((section) => {
-            const verdictSplit = VERDICT_SECTION_KEYS.has(section.key)
-              ? splitLeadingVerdict(section.text)
-              : null;
-            const isDash = section.text.trim() === DASH_TEXT;
-            return (
-              <Fragment key={section.key}>
-                <dt className="m-0 font-mono text-11 font-semibold tracking-[0.4px] text-fg-3">
-                  {section.key}
-                </dt>
-                <dd className="m-0 min-w-0">
-                  {verdictSplit !== null ? (
-                    <div className="flex items-start gap-2">
-                      <VerdictTag verdict={verdictSplit.verdict} />
+        {runCount > 1 && <span className="ml-auto text-12 text-fg-3">第 {run.seq} 次运行</span>}
+      </header>
+      <div className="px-4 py-3">
+        {report !== null && (
+          <dl className="grid grid-cols-[96px_minmax(0,1fr)] gap-x-3 gap-y-2.5 max-md:grid-cols-1">
+            {report.sections.map((section) => {
+              const verdictSplit = VERDICT_SECTION_KEYS.has(section.key)
+                ? splitLeadingVerdict(section.text)
+                : null;
+              const isDash = section.text.trim() === DASH_TEXT;
+              return (
+                <Fragment key={section.key}>
+                  <dt className="pt-px font-mono text-12 text-fg-3">{section.key}</dt>
+                  <dd className="min-w-0 text-13 whitespace-pre-wrap break-words text-fg-1">
+                    {verdictSplit !== null ? (
+                      <div className="flex items-start gap-2">
+                        <VerdictTag verdict={verdictSplit.verdict} />
+                        <ClampedText
+                          content={verdictSplit.rest}
+                          maxLines={10}
+                          textClassName={TEXT_CLASS}
+                        />
+                      </div>
+                    ) : (
                       <ClampedText
-                        content={verdictSplit.rest}
+                        content={section.text}
                         maxLines={10}
-                        textClassName={TEXT_CLASS}
+                        textClassName={isDash ? TEXT_MUTED_CLASS : TEXT_CLASS}
                       />
-                    </div>
-                  ) : (
-                    <ClampedText
-                      content={section.text}
-                      maxLines={10}
-                      textClassName={isDash ? TEXT_MUTED_CLASS : TEXT_CLASS}
-                    />
-                  )}
-                </dd>
-              </Fragment>
-            );
-          })}
-        </dl>
-      )}
-      {report === null && run.finalText !== null && (
-        <div className="mt-3">
+                    )}
+                  </dd>
+                </Fragment>
+              );
+            })}
+          </dl>
+        )}
+        {report === null && run.finalText !== null && (
           <ClampedText content={run.finalText} maxLines={12} textClassName={TEXT_CLASS} />
-        </div>
-      )}
+        )}
+      </div>
     </section>
   );
 }
 
-const TEXT_CLASS = "text-13 wrap-anywhere whitespace-pre-wrap text-fg-1";
-const TEXT_MUTED_CLASS = "text-13 wrap-anywhere whitespace-pre-wrap text-fg-3";
+const TEXT_CLASS = "text-13 whitespace-pre-wrap break-words text-fg-1";
+const TEXT_MUTED_CLASS = "text-13 whitespace-pre-wrap break-words text-fg-3";

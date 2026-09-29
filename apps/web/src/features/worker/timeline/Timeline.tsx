@@ -101,7 +101,7 @@ export function Timeline() {
       );
     }
     if (status !== "ready") {
-      // idle / notFound / error：R6 会把整个右栏换成 EmptyState，正常不会渲染到这里，防御性地不画内容
+      // idle / notFound / error：WorkerDetail 会展示 EmptyState，正常不会渲染到这里，防御性地不画内容
       return null;
     }
     if (rows.length === 0) {
@@ -113,7 +113,7 @@ export function Timeline() {
           <div className="flex justify-center py-2">
             <button
               type="button"
-              className="text-12 text-brand hover:underline"
+              className="text-12 text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
               onClick={() => setShowAll(true)}
             >
               显示更早的 {hiddenCount} 条
@@ -138,7 +138,7 @@ export function Timeline() {
   }
 
   return (
-    <section className="mt-4 flex flex-col" data-timeline aria-label="时间线">
+    <section className="mt-6 flex flex-col" data-timeline aria-label="时间线">
       <TimelineHeader counts={counts} filter={filter} onFilterChange={setFilter} />
       {renderBody()}
       {unreadCount > 0 && <JumpToLatest count={unreadCount} onClick={jumpToLatest} />}

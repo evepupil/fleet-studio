@@ -19,6 +19,7 @@ function ConnectionGate({ children }: { children: ReactNode }) {
       </div>
     );
   }
+
   return children;
 }
 

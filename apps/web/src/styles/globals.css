@@ -3,8 +3,10 @@
 @import "./tokens.css";
 
 @theme inline {
-  --color-page: var(--bg-page);
+  --color-window: var(--bg-window);
   --color-panel: var(--bg-panel);
+  --color-column: var(--bg-column);
+  --color-card: var(--bg-card);
   --color-raised: var(--bg-raised);
   --color-overlay: var(--bg-overlay);
   --color-hover: var(--bg-hover);
@@ -18,12 +20,13 @@
   --color-brand: var(--accent);
   --color-brand-soft: var(--accent-soft);
   --color-on-brand: var(--on-accent);
+  --color-team: var(--team);
   --color-status-queued: var(--st-queued);
   --color-status-running: var(--st-running);
+  --color-status-warning: var(--st-warning);
   --color-status-done: var(--st-done);
   --color-status-failed: var(--st-failed);
   --color-status-cancelled: var(--st-cancelled);
-  --color-status-warning: var(--st-warning);
   --color-status-warning-soft: var(--st-warning-soft);
   --color-status-failed-soft: var(--st-failed-soft);
   --color-proj-0: var(--proj-0);
@@ -45,9 +48,8 @@
   --color-series-other: var(--series-other);
   --color-scrim: var(--scrim);
 
-  --color-background: var(--bg-page);
+  --color-background: var(--bg-panel);
   --color-foreground: var(--text-1);
-  --color-card: var(--bg-panel);
   --color-card-foreground: var(--text-1);
   --color-popover: var(--bg-overlay);
   --color-popover-foreground: var(--text-1);
@@ -60,9 +62,9 @@
   --color-accent: var(--bg-hover);
   --color-accent-foreground: var(--text-1);
   --color-destructive: var(--st-failed);
-  --color-destructive-foreground: var(--text-1);
+  --color-destructive-foreground: var(--on-accent);
   --color-border: var(--line);
-  --color-input: var(--line-strong);
+  --color-input: var(--line);
   --color-ring: var(--accent);
   --color-chart-1: var(--series-0);
   --color-chart-2: var(--series-1);
@@ -72,19 +74,9 @@
   --color-chart-6: var(--series-5);
   --color-chart-7: var(--series-6);
   --color-chart-8: var(--series-7);
-  --color-sidebar: var(--bg-panel);
-  --color-sidebar-foreground: var(--text-2);
-  --color-sidebar-primary: var(--accent);
-  --color-sidebar-primary-foreground: var(--on-accent);
-  --color-sidebar-accent: var(--bg-selected);
-  --color-sidebar-accent-foreground: var(--accent);
-  --color-sidebar-border: var(--line);
-  --color-sidebar-ring: var(--accent);
 
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --text-11: var(--fs-11);
-  --text-11--line-height: var(--lh-11);
   --text-12: var(--fs-12);
   --text-12--line-height: var(--lh-12);
   --text-13: var(--fs-13);
@@ -93,22 +85,21 @@
   --text-14--line-height: var(--lh-14);
   --text-16: var(--fs-16);
   --text-16--line-height: var(--lh-16);
-  --text-22: var(--fs-22);
-  --text-22--line-height: var(--lh-22);
-  --text-28: var(--fs-28);
-  --text-28--line-height: var(--lh-28);
 
   --spacing: 4px;
   --breakpoint-md: 800px;
+  --radius-sm: var(--r-chip);
+  --radius-md: var(--r-control);
+  --radius-lg: var(--r-card);
+  --radius-xl: var(--r-card);
+  --shadow-card: var(--shadow-card);
+  --shadow-panel: var(--shadow-panel);
+  --shadow-overlay: var(--shadow-overlay);
   --shadow-2xs: 0 0 0 0 transparent;
   --shadow-xs: 0 0 0 0 transparent;
   --shadow-sm: 0 0 0 0 transparent;
   --shadow-md: var(--shadow-overlay);
   --shadow-lg: var(--shadow-overlay);
-  --radius-sm: var(--r-sm);
-  --radius-md: var(--r-md);
-  --radius-lg: var(--r-lg);
-  --radius-xl: var(--r-lg);
   --animate-spin-slow: spin 1.2s linear infinite;
 }
 
@@ -118,37 +109,49 @@
   }
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 html,
 body,
 #root {
   height: 100%;
+  overflow: hidden;
 }
 
 body {
-  @apply bg-page text-13 text-fg-1 font-sans;
-  font-family: var(--font-sans);
+  @apply bg-window text-13 text-fg-1 font-sans antialiased;
+  margin: 0;
 }
 
-[data-shell-content][data-offline="true"] [data-page-body] {
-  opacity: 0.6;
+svg.lucide {
+  stroke-width: var(--icon-stroke);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }
 
 ::selection {
   @apply bg-brand-soft;
 }
 
+/* 全站兜底的焦点环：只在键盘聚焦时出现 */
 :focus-visible {
-  @apply outline-brand outline-2 outline-offset-2;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .hatch {
   background-image: repeating-linear-gradient(45deg, var(--hatch) 0 1px, transparent 1px 4px);
+}
+
+[data-workspace][data-offline="true"] [data-page-body] {
+  opacity: 0.6;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -15,8 +15,9 @@ export interface TaskFilterState {
   order: "asc" | "desc";
 }
 
+/** 默认不筛：列表看全部历史，看板本来就只有进行中和最近 24 小时的任务 */
 const DEFAULT_FILTERS: TaskFilterState = {
-  status: "active",
+  status: "all",
   project: undefined,
   pool: undefined,
   role: undefined,

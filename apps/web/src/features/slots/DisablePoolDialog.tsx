@@ -54,7 +54,7 @@ function DisablePoolDialog({ pool, onCancel, onConfirm, pending, error }: Disabl
         className="w-[400px] max-w-[400px] rounded-lg bg-overlay data-[size=default]:sm:max-w-[400px]"
       >
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-14 font-semibold">
+          <AlertDialogTitle className="text-14 font-medium">
             {pool === null ? "" : `停用 ${pool.id}？`}
           </AlertDialogTitle>
           {message === null ? null : (
@@ -69,10 +69,10 @@ function DisablePoolDialog({ pool, onCancel, onConfirm, pending, error }: Disabl
           <AlertDialogCancel disabled={pending}>取消</AlertDialogCancel>
           <Button
             type="button"
+            variant="destructive"
             data-confirm-disable
             disabled={pending}
             onClick={onConfirm}
-            className="bg-status-failed text-on-brand hover:brightness-110"
           >
             {pending ? (
               <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin-slow" />

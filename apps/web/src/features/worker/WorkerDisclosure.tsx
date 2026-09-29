@@ -34,18 +34,16 @@ export function WorkerDisclosure({
       data-disclosure={id}
       data-open={openFlag}
     >
-      <CollapsibleTrigger className="flex h-8 w-full items-center gap-2 rounded-md text-left transition-colors duration-[var(--dur-fast)] ease-[var(--ease)] hover:bg-hover">
+      <CollapsibleTrigger className="flex h-8 w-full items-center gap-2 rounded-md px-1 text-left transition-colors hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
         <ChevronRight
           aria-hidden
-          size={12}
+          size={14}
           data-open={openFlag}
           className="shrink-0 text-fg-3 transition-transform duration-[var(--dur-base)] ease-[var(--ease)] data-[open=true]:rotate-90"
         />
-        <span className="min-w-0 flex-1 text-left text-14 font-semibold text-fg-1">{title}</span>
+        <span className="min-w-0 flex-1 text-left text-13 font-medium text-fg-1">{title}</span>
         {meta !== undefined && (
-          <span className="min-w-0 max-w-2/5 shrink-0 truncate text-right text-12 text-fg-3">
-            {meta}
-          </span>
+          <span className="min-w-0 max-w-[50%] truncate text-right text-12 text-fg-3">{meta}</span>
         )}
       </CollapsibleTrigger>
       <CollapsibleContent>{children}</CollapsibleContent>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-/** 时间线滚动容器的元素 id，由页面骨架（App.tsx）提供，详情和时间线共用同一个滚动容器。 */
+/** 时间线滚动容器由详情页提供，详情和时间线共用同一个滚动容器。 */
 const SCROLL_CONTAINER_ID = "detail-scroll";
 /** 距底部小于这个像素数就算「停在底部」。 */
 const BOTTOM_THRESHOLD_PX = 48;

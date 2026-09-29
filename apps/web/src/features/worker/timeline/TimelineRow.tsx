@@ -142,14 +142,14 @@ function TextContent({
     <div className="flex min-w-0 flex-col items-start gap-1">
       <p
         data-clamped={overflow && !expanded ? "true" : "false"}
-        className={`m-0 w-full min-w-0 text-13 wrap-anywhere whitespace-pre-wrap text-fg-1 ${overflow && !expanded ? "line-clamp-8" : ""}`}
+        className={`m-0 w-full min-w-0 text-13 break-words whitespace-pre-wrap text-fg-1 ${overflow && !expanded ? "line-clamp-8" : ""}`}
       >
         {row.text}
       </p>
       {overflow && (
         <button
           type="button"
-          className="text-12 text-brand hover:underline"
+          className="text-12 text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           aria-expanded={expanded}
           onClick={() => onToggle(row.key)}
         >
@@ -170,7 +170,7 @@ function ThinkingContent({
     return (
       <button
         type="button"
-        className="inline-flex max-w-full min-w-0 items-center gap-1"
+        className="inline-flex max-w-full min-w-0 items-center gap-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         aria-expanded={expanded}
         onClick={() => onToggle(row.key)}
       >
@@ -183,13 +183,13 @@ function ThinkingContent({
     <div className="flex w-full min-w-0 flex-col items-start gap-1">
       <button
         type="button"
-        className="text-12 text-fg-3"
+        className="text-12 text-fg-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         aria-expanded={expanded}
         onClick={() => onToggle(row.key)}
       >
         思考
       </button>
-      <p className="m-0 max-h-[320px] w-full min-w-0 overflow-y-auto text-12 wrap-anywhere whitespace-pre-wrap text-fg-2">
+      <p className="m-0 max-h-[320px] w-full min-w-0 overflow-y-auto text-12 break-words whitespace-pre-wrap text-fg-2">
         {row.text}
       </p>
     </div>
@@ -213,7 +213,7 @@ function RetryContent({ row }: { row: Extract<TimelineRowData, { kind: "retry" }
 function ErrorContent({ row }: { row: Extract<TimelineRowData, { kind: "error" }> }) {
   return (
     <p
-      className="m-0 line-clamp-4 w-full min-w-0 text-13 wrap-anywhere whitespace-pre-wrap text-fg-1"
+      className="m-0 line-clamp-4 w-full min-w-0 text-13 break-words whitespace-pre-wrap text-fg-1"
       title={row.message}
     >
       {row.message}
@@ -224,8 +224,8 @@ function ErrorContent({ row }: { row: Extract<TimelineRowData, { kind: "error" }
 function OutputContent({ row }: { row: Extract<TimelineRowData, { kind: "output" }> }) {
   return (
     <div className="flex w-full min-w-0 flex-col gap-0.5" title={row.text}>
-      <span className="font-mono text-11 text-fg-3">{row.stream}</span>
-      <p className="m-0 line-clamp-4 min-w-0 font-mono text-12 wrap-anywhere whitespace-pre-wrap text-fg-2">
+      <span className="font-mono text-12 text-fg-3">{row.stream}</span>
+      <p className="m-0 line-clamp-4 min-w-0 font-mono text-12 break-words whitespace-pre-wrap text-fg-2">
         {row.text}
       </p>
     </div>

@@ -29,7 +29,7 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        "fixed inset-0 z-[var(--z-tooltip)] bg-scrim data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[var(--dur-fast)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-[var(--dur-base)]",
+        "fixed inset-0 z-[var(--z-overlay)] bg-scrim data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[var(--dur-fast)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-[var(--dur-base)]",
         className,
       )}
       {...props}
@@ -41,7 +41,7 @@ function SheetContent({
   className,
   children,
   side = "right",
-  showCloseButton = true,
+  showCloseButton = false,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left";
@@ -53,22 +53,24 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed z-[var(--z-tooltip)] flex flex-col gap-4 bg-background shadow-md data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[var(--dur-fast)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-[var(--dur-base)]",
-          side === "right" && "inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
-          side === "left" && "inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
-          side === "top" && "inset-x-0 top-0 h-auto border-b",
-          side === "bottom" && "inset-x-0 bottom-0 h-auto border-t",
+          "fixed z-[var(--z-overlay)] flex flex-col bg-window shadow-overlay data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[var(--dur-fast)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-[var(--dur-base)]",
+          side === "right" && "inset-y-0 right-0 h-full w-[var(--sidebar-w)] border-l border-line",
+          side === "left" && "inset-y-0 left-0 h-full w-[var(--sidebar-w)] border-r border-line",
+          side === "top" && "inset-x-0 top-0 h-auto border-b border-line",
+          side === "bottom" && "inset-x-0 bottom-0 h-auto border-t border-line",
           className,
         )}
         {...props}
       >
         {children}
-        {showCloseButton && (
-          <SheetPrimitive.Close className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-secondary">
-            <X aria-hidden="true" className="size-4" />
-            <span className="sr-only">Close</span>
+        {showCloseButton ? (
+          <SheetPrimitive.Close
+            aria-label="关闭"
+            className="absolute right-2 top-2 inline-flex size-6 items-center justify-center rounded-md text-fg-2 hover:bg-hover hover:text-fg-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            <X aria-hidden="true" className="size-3.5" />
           </SheetPrimitive.Close>
-        )}
+        ) : null}
       </SheetPrimitive.Content>
     </SheetPortal>
   );
@@ -94,7 +96,7 @@ function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPr
   return (
     <SheetPrimitive.Title
       data-slot="sheet-title"
-      className={cn("font-semibold text-foreground", className)}
+      className={cn("text-13 font-medium text-fg-1", className)}
       {...props}
     />
   );
@@ -107,7 +109,7 @@ function SheetDescription({
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"
-      className={cn("text-13 text-muted-foreground", className)}
+      className={cn("text-13 text-fg-2", className)}
       {...props}
     />
   );

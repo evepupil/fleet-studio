@@ -38,7 +38,7 @@ export function TimelineFilterControl({ options, value, onChange }: TimelineFilt
           onChange(nextValue);
         }
       }}
-      className="inline-flex h-8 rounded-md border border-line bg-panel p-0.5"
+      className="inline-flex h-7 items-center gap-0.5 rounded-md border border-line bg-card p-0.5"
     >
       {options.map((option) => (
         <ToggleGroupItem
@@ -48,7 +48,7 @@ export function TimelineFilterControl({ options, value, onChange }: TimelineFilt
           data-filter={option.value}
           data-checked={option.value === value ? "true" : "false"}
           data-seg={`timeline:${option.value}`}
-          className="h-7 gap-1 rounded-sm px-3 text-12 text-fg-2 hover:bg-hover data-[state=on]:bg-brand-soft data-[state=on]:text-brand disabled:pointer-events-none disabled:text-fg-3"
+          className="h-6 gap-1 rounded-sm px-2 text-12 font-normal text-fg-2 hover:bg-hover data-[state=on]:bg-selected data-[state=on]:text-fg-1 data-[state=on]:font-medium disabled:pointer-events-none disabled:text-fg-3"
         >
           {option.label}
           <span className="font-mono">{option.count}</span>

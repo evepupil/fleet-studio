@@ -27,7 +27,7 @@ describe("taskFilterStore overview filters", () => {
     expect(useTaskFilterStore.getState()).toMatchObject({
       channel: "anthropic",
       model: "claude-sonnet",
-      status: "active",
+      status: "all",
       range: { kind: "all" },
     });
   });

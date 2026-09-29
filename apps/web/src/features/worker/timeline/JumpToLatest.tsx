@@ -12,7 +12,7 @@ export function JumpToLatest({ count, onClick }: JumpToLatestProps) {
       type="button"
       data-jump-latest
       onClick={onClick}
-      className="sticky bottom-4 flex h-7 items-center gap-1 self-end rounded-md bg-brand px-3 text-12 font-medium whitespace-nowrap text-on-brand transition duration-[var(--dur-fast)] ease-[var(--ease)] hover:brightness-110 active:brightness-95"
+      className="sticky bottom-4 self-end inline-flex h-7 items-center gap-1 rounded-md bg-brand px-3 text-12 font-medium text-on-brand shadow-overlay hover:brightness-110 active:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
     >
       <ArrowDown aria-hidden size={12} />
       回到最新 · {count} 条

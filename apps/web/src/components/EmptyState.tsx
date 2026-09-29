@@ -12,9 +12,9 @@ function EmptyState({ message, command, action, icon: Icon }: EmptyStateProps) {
   return (
     <section
       data-empty
-      className="flex flex-col items-center justify-center gap-2 py-12 text-center"
+      className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center"
     >
-      {Icon ? <Icon aria-hidden="true" className="size-5 text-fg-3" /> : null}
+      {Icon ? <Icon aria-hidden="true" className="size-4 text-fg-3" /> : null}
       <p className="text-13 text-fg-2">{message}</p>
       {command ? (
         <code className="rounded-sm bg-raised px-1.5 py-0.5 font-mono text-12 text-fg-1">
@@ -22,7 +22,7 @@ function EmptyState({ message, command, action, icon: Icon }: EmptyStateProps) {
         </code>
       ) : null}
       {action ? (
-        <Button type="button" variant="link" onClick={action.onClick} className="text-brand">
+        <Button type="button" variant="link" size="sm" onClick={action.onClick}>
           {action.label}
         </Button>
       ) : null}

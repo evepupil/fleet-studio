@@ -30,14 +30,14 @@ export function TaskSection({ detail }: TaskSectionProps) {
     return null;
   }
   return (
-    <section className="mt-4" data-task>
+    <section className="mt-6" data-task>
       <WorkerDisclosure
         id="task"
-        title="任务"
+        title="任务书"
         meta={firstNonEmptyLine(firstRun.prompt)}
         defaultOpen={detail.summary.status === "queued"}
       >
-        <div className="mt-1 max-h-[360px] overflow-y-auto rounded-md border border-line bg-raised px-3.5 py-3 text-13 wrap-anywhere whitespace-pre-wrap text-fg-1">
+        <div className="mt-2 max-h-[360px] overflow-y-auto rounded-lg border border-line bg-raised px-3 py-2.5 text-13 whitespace-pre-wrap break-words text-fg-1">
           {firstRun.prompt}
         </div>
       </WorkerDisclosure>

@@ -5,7 +5,7 @@ function VerdictTag({ verdict }: { verdict: Verdict }) {
   return (
     <span
       data-verdict={verdict}
-      className={`inline-flex h-[18px] items-center rounded-sm border px-1.5 text-11 font-semibold ${passed ? "border-status-done text-status-done" : "border-status-failed text-status-failed"}`}
+      className={`inline-flex h-5 items-center rounded-sm border border-line bg-card px-1.5 text-12 font-medium ${passed ? "text-status-done" : "text-status-failed"}`}
     >
       {passed ? "通过" : "不通过"}
     </span>

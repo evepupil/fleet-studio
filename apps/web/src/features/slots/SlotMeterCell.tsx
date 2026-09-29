@@ -64,7 +64,7 @@ function SlotMeterCell({
             {projectName}
           </div>
           <div className="truncate text-12 text-fg-1">{slot.title}</div>
-          <div className="text-11 text-fg-3">
+          <div className="text-12 text-fg-3">
             {slot.roleLabel} · <Duration from={slot.startedAt} />
             {slot.retrying ? <span className="text-status-warning"> · 正在重试</span> : null}
           </div>

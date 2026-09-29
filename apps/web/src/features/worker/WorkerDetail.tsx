@@ -1,37 +1,31 @@
 import { useEffect } from "react";
 import { EmptyState } from "@/components/EmptyState";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useWorkerStore } from "@/state/workerStore";
 import { DetailHeader } from "./DetailHeader";
 import { DetailLoadingSkeleton } from "./DetailStates";
-import { MetaGrid } from "./MetaGrid";
 import { ReportCard } from "./ReportCard";
+import { TaskProperties } from "./TaskProperties";
 import { TaskSection } from "./TaskSection";
 import { Timeline } from "./timeline/Timeline";
 
 export interface WorkerDetailProps {
   id: string;
-  onClose(): void;
+  onBack(): void;
 }
 
-/**
- * 详情卡片自己就是滚动容器（跟随滚动按 id="detail-scroll" 找它），所以滚动和边框在这一层，
- * 内边距与最大宽挪到里面的内容层。外层类名与 T4 规格逐字一致。
- */
-const ROOT_CLASS = "min-h-0 min-w-0 overflow-y-auto rounded-lg border border-line bg-panel";
-/** 内容内边距与最大宽：宽屏 --sp-5 --sp-6 40px、窄屏统一 --sp-4，最大宽 1120px 左对齐。 */
-const BODY_CLASS = "max-w-[1120px] p-4 lg:px-6 lg:pt-5 lg:pb-10";
-/** 空状态与失败状态占满右栏居中（第一版 .centered 的等价写法）。 */
-const CENTERED_CLASS = "flex min-h-full items-center justify-center";
+const PROPERTY_SKELETON_KEYS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"];
 
 /**
- * 苦工详情（R6 详情头与元信息、R7 任务与回报、R8 时间线）。
- * 状态优先级从上到下：找不到 → 加载失败 → 加载中 → 正常内容，任何时候只有一种成立。
- * 挂载或编号变化时订阅这个苦工的详情和事件流，卸载时退订，避免离开详情后还在收数据。
+ * 挂载或编号变化时订阅详情和事件流，卸载时退订，避免离开详情后还在收数据。
+ * 时间线与正文共用 detail-scroll，滚动跟随逻辑据此定位容器。
  */
-export function WorkerDetail({ id, onClose }: WorkerDetailProps) {
+export function WorkerDetail({ id, onBack }: WorkerDetailProps) {
   const detail = useWorkerStore((state) => state.detail);
   const status = useWorkerStore((state) => state.status);
   const error = useWorkerStore((state) => state.error);
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   useEffect(() => {
     useWorkerStore.getState().open(id);
@@ -40,35 +34,44 @@ export function WorkerDetail({ id, onClose }: WorkerDetailProps) {
 
   if (status === "notFound") {
     return (
-      <section data-detail id="detail-scroll" className={ROOT_CLASS}>
-        <div className={CENTERED_CLASS}>
-          <EmptyState message="没有这个任务" />
-        </div>
-      </section>
+      <div data-detail className="flex flex-1 items-center justify-center p-6">
+        <EmptyState message="没有这个任务" action={{ label: "回到任务", onClick: onBack }} />
+      </div>
     );
   }
 
   if (status === "error") {
     return (
-      <section data-detail id="detail-scroll" className={ROOT_CLASS}>
-        <div className={CENTERED_CLASS}>
-          <EmptyState
-            message={`加载失败：${error ?? ""}`}
-            action={{ label: "重试", onClick: () => useWorkerStore.getState().open(id) }}
-          />
-        </div>
-      </section>
+      <div data-detail className="flex flex-1 items-center justify-center p-6">
+        <EmptyState
+          message={`加载失败：${error ?? ""}`}
+          action={{ label: "重试", onClick: () => useWorkerStore.getState().open(id) }}
+        />
+      </div>
     );
   }
 
-  // status !== "ready" 覆盖 "loading" 以及尚未触发 open() 的瞬时 "idle"；detail === null 是防御性兜底。
   if (status !== "ready" || detail === null) {
     return (
-      <section data-detail id="detail-scroll" className={ROOT_CLASS}>
-        <div className={BODY_CLASS}>
-          <DetailLoadingSkeleton />
+      <div data-detail className="flex min-h-0 min-w-0 flex-1">
+        <div id="detail-scroll" className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[800px] px-6 pb-12 pt-6 max-lg:px-4 max-lg:pt-4">
+            <DetailLoadingSkeleton />
+          </div>
         </div>
-      </section>
+        {isDesktop ? (
+          <aside
+            data-properties-aside
+            className="w-[var(--detail-aside-w)] shrink-0 overflow-y-auto border-l border-line px-4 py-5"
+          >
+            <div className="flex flex-col gap-4">
+              {PROPERTY_SKELETON_KEYS.map((key) => (
+                <Skeleton key={key} className="h-4 w-full" />
+              ))}
+            </div>
+          </aside>
+        ) : null}
+      </div>
     );
   }
 
@@ -77,16 +80,26 @@ export function WorkerDetail({ id, onClose }: WorkerDetailProps) {
   const showReport = latestRun !== undefined && latestRun.finalText !== null && isTerminal;
 
   return (
-    <section data-detail id="detail-scroll" className={ROOT_CLASS}>
-      <div className={BODY_CLASS}>
-        <DetailHeader detail={detail} onClose={onClose} />
-        <MetaGrid detail={detail} />
-        {showReport && latestRun !== undefined && (
-          <ReportCard run={latestRun} runCount={detail.runs.length} />
-        )}
-        <TaskSection detail={detail} />
-        <Timeline />
+    <div data-detail className="flex min-h-0 min-w-0 flex-1">
+      <div id="detail-scroll" className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-[800px] px-6 pb-12 pt-6 max-lg:px-4 max-lg:pt-4">
+          <DetailHeader detail={detail} />
+          {!isDesktop ? <TaskProperties detail={detail} variant="inline" /> : null}
+          {showReport && latestRun !== undefined && (
+            <ReportCard run={latestRun} runCount={detail.runs.length} />
+          )}
+          <TaskSection detail={detail} />
+          <Timeline />
+        </div>
       </div>
-    </section>
+      {isDesktop ? (
+        <aside
+          data-properties-aside
+          className="w-[var(--detail-aside-w)] shrink-0 overflow-y-auto border-l border-line px-4 py-5"
+        >
+          <TaskProperties detail={detail} variant="aside" />
+        </aside>
+      ) : null}
+    </div>
   );
 }

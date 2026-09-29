@@ -30,31 +30,31 @@ function Calendar({
           nav: cn("absolute inset-x-0 top-0 flex items-center justify-between", defaults.nav),
           button_previous: cn(
             buttonVariants({ variant: buttonVariant }),
-            "size-8 p-0 aria-disabled:opacity-50",
+            "size-7 p-0 aria-disabled:opacity-50",
             defaults.button_previous,
           ),
           button_next: cn(
             buttonVariants({ variant: buttonVariant }),
-            "size-8 p-0 aria-disabled:opacity-50",
+            "size-7 p-0 aria-disabled:opacity-50",
             defaults.button_next,
           ),
-          month_caption: cn("flex h-8 items-center justify-center", defaults.month_caption),
+          month_caption: cn("flex h-7 items-center justify-center", defaults.month_caption),
           dropdowns: cn(
-            "flex h-8 items-center justify-center gap-2 text-13 font-medium",
+            "flex h-7 items-center justify-center gap-2 text-13 font-medium",
             defaults.dropdowns,
           ),
-          dropdown_root: cn("relative rounded-md border border-input", defaults.dropdown_root),
-          dropdown: cn("absolute inset-0 bg-popover opacity-0", defaults.dropdown),
+          dropdown_root: cn("relative rounded-md border border-line", defaults.dropdown_root),
+          dropdown: cn("absolute inset-0 bg-overlay opacity-0", defaults.dropdown),
           caption_label: cn("font-medium", defaults.caption_label),
           month_grid: cn("w-full border-collapse", defaults.month_grid),
           weekdays: cn("flex", defaults.weekdays),
-          weekday: cn("flex-1 text-11 font-normal text-muted-foreground", defaults.weekday),
+          weekday: cn("flex-1 text-12 font-normal text-fg-3", defaults.weekday),
           week: cn("mt-1 flex w-full", defaults.week),
           day: cn("relative aspect-square h-full w-full p-0 text-center", defaults.day),
-          range_start: cn("rounded-l-md bg-brand-soft", defaults.range_start),
+          range_start: cn("rounded-l-md", defaults.range_start),
           range_middle: cn("rounded-none bg-brand-soft", defaults.range_middle),
-          range_end: cn("rounded-r-md bg-brand-soft", defaults.range_end),
-          today: cn("rounded-md bg-hover text-fg-1", defaults.today),
+          range_end: cn("rounded-r-md", defaults.range_end),
+          today: cn("font-medium ring-1 ring-line-strong", defaults.today),
           outside: cn("text-fg-3", defaults.outside),
           disabled: cn("text-fg-3 opacity-50", defaults.disabled),
           hidden: cn("invisible", defaults.hidden),
@@ -103,16 +103,16 @@ function CalendarDayButton({
   const ref = React.useRef<HTMLButtonElement>(null);
   const focused = modifiers["focused"];
   React.useEffect(() => {
-    if (focused) {
-      ref.current?.focus();
-    }
+    if (focused) ref.current?.focus();
   }, [focused]);
+
   return (
     <Button
       ref={ref}
       variant="ghost"
       size="icon"
       data-day={day.date.toLocaleDateString()}
+      data-today={modifiers["today"]}
       data-selected-single={
         modifiers["selected"] &&
         !modifiers["range_start"] &&
@@ -123,7 +123,7 @@ function CalendarDayButton({
       data-range-end={modifiers["range_end"]}
       data-range-middle={modifiers["range_middle"]}
       className={cn(
-        "flex aspect-square size-8 min-w-8 flex-col p-0 text-13 font-normal data-[range-start=true]:rounded-l-md data-[range-end=true]:rounded-r-md data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-brand-soft data-[range-middle=true]:text-fg-1 data-[range-start=true]:bg-brand data-[range-end=true]:bg-brand data-[selected-single=true]:bg-brand data-[selected-single=true]:text-on-brand",
+        "flex aspect-square size-7 min-w-7 flex-col p-0 text-12 font-normal data-[range-start=true]:rounded-l-md data-[range-end=true]:rounded-r-md data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-brand-soft data-[range-middle=true]:text-fg-1 data-[range-start=true]:bg-brand data-[range-end=true]:bg-brand data-[range-start=true]:text-on-brand data-[range-end=true]:text-on-brand data-[selected-single=true]:bg-brand data-[selected-single=true]:text-on-brand data-[today=true]:font-medium data-[today=true]:ring-1 data-[today=true]:ring-line-strong",
         defaults.day,
         className,
       )}

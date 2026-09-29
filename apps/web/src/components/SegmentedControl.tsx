@@ -33,10 +33,11 @@ function SegmentedControl<Value extends string>({
       aria-label={ariaLabel}
       data-control={name}
       onValueChange={(nextValue: string) => {
-        if (nextValue !== "") onChange(nextValue as Value);
+        const selected = options.find((option) => option.value === nextValue);
+        if (selected) onChange(selected.value);
         else onReselect?.(value);
       }}
-      className={`inline-flex rounded-md border border-line bg-panel p-0.5 ${small ? "h-7" : "h-8"}`}
+      className={`inline-flex items-center gap-0.5 rounded-md border border-line bg-card p-0.5 ${small ? "h-6" : "h-7"}`}
     >
       {options.map((option) => (
         <ToggleGroupItem
@@ -44,7 +45,7 @@ function SegmentedControl<Value extends string>({
           value={option.value}
           disabled={option.disabled}
           data-seg={`${name}:${option.value}`}
-          className={`rounded-sm text-12 text-fg-2 hover:bg-hover data-[state=on]:bg-brand-soft data-[state=on]:text-brand ${small ? "h-6 px-2" : "h-7 px-3"} disabled:pointer-events-none disabled:text-fg-3`}
+          className={`rounded-sm text-12 text-fg-2 hover:bg-hover hover:text-fg-1 data-[state=on]:bg-selected data-[state=on]:text-fg-1 data-[state=on]:font-medium ${small ? "h-5 px-1.5" : "h-6 px-2"} disabled:pointer-events-none disabled:text-fg-3`}
         >
           {option.label}
         </ToggleGroupItem>

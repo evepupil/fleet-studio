@@ -32,7 +32,7 @@ export function ToolRow({ row, now, expanded, onToggle, spinning }: ToolRowProps
     <>
       <button
         type="button"
-        className={`${GRID_CLASS} w-full rounded-sm py-1.5 transition-colors duration-[var(--dur-fast)] ease-[var(--ease)] enabled:hover:bg-hover`}
+        className={`${GRID_CLASS} w-full rounded-sm py-1.5 transition-colors duration-[var(--dur-fast)] ease-[var(--ease)] enabled:hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand`}
         aria-expanded={expanded}
         aria-controls={hasPanel ? panelId : undefined}
         disabled={!hasPanel}
@@ -42,7 +42,7 @@ export function ToolRow({ row, now, expanded, onToggle, spinning }: ToolRowProps
         <Icon aria-hidden size={14} className="mt-[3px] text-fg-2" />
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="shrink-0 font-mono text-12 text-fg-2">{row.tool}</span>
-          <span className="min-w-0 truncate font-mono text-13 text-fg-1" title={row.summary}>
+          <span className="min-w-0 truncate font-mono text-12 text-fg-1" title={row.summary}>
             {row.summary}
           </span>
         </span>
@@ -55,7 +55,7 @@ export function ToolRow({ row, now, expanded, onToggle, spinning }: ToolRowProps
           <div className="col-start-3 col-end-4 flex min-w-0 flex-col gap-2 lg:col-end-5">
             {row.detail !== null && (
               <div>
-                <div className="mb-1 text-11 text-fg-3">参数</div>
+                <div className="mb-1 text-12 text-fg-3">参数</div>
                 {/* 数据属性取值用完整字符串，不用布尔值：React 对 false 会整个不渲染属性 */}
                 <pre
                   data-failed="false"
@@ -67,12 +67,12 @@ export function ToolRow({ row, now, expanded, onToggle, spinning }: ToolRowProps
             )}
             {row.result !== null && (
               <div>
-                <div className="mb-1 text-11 text-fg-3">
+                <div className="mb-1 text-12 text-fg-3">
                   结果{row.result.truncated ? "（已截断）" : ""}
                 </div>
                 <pre
                   data-failed={row.result.ok ? "false" : "true"}
-                  className={`m-0 max-h-[240px] overflow-auto rounded-md border bg-raised px-2.5 py-2 font-mono text-12 break-all whitespace-pre-wrap text-fg-2 ${row.result.ok ? "border-line" : "border-line border-l-2 border-l-status-failed"}`}
+                  className={`m-0 max-h-[240px] overflow-auto rounded-md border border-line bg-raised px-2.5 py-2 font-mono text-12 break-all whitespace-pre-wrap text-fg-2 ${row.result.ok ? "" : "border-l-2 border-l-status-failed"}`}
                 >
                   {row.result.preview}
                 </pre>

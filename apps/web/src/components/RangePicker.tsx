@@ -28,12 +28,12 @@ interface RangePickerProps {
   name: string;
 }
 
-const PRESET_OPTIONS = [
+const PRESET_OPTIONS: { value: RangeKind; label: string }[] = [
   { value: "today", label: "今日" },
   { value: "7d", label: "近 7 天" },
   { value: "30d", label: "近 30 天" },
   { value: "all", label: "全部" },
-] as const;
+];
 
 function fromDateString(value?: string): Date | undefined {
   if (value === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
@@ -65,7 +65,10 @@ function RangePicker({ value, onChange, variant, name }: RangePickerProps) {
   }, [value.from, value.to]);
   const customLabel = value.kind === "custom" ? formatRangeLabel(value, nowMs) : "自选";
   const selectedValue = open ? "custom" : value.kind;
-  const options = [...PRESET_OPTIONS, { value: "custom" as const, label: customLabel }];
+  const options: { value: RangeKind | "custom"; label: string }[] = [
+    ...PRESET_OPTIONS,
+    { value: "custom", label: customLabel },
+  ];
   const selectedLabel = options.find((option) => option.value === selectedValue)?.label ?? "全部";
 
   function openCalendar(): void {
@@ -97,11 +100,13 @@ function RangePicker({ value, onChange, variant, name }: RangePickerProps) {
       />
     ) : (
       <Select
-        // 自选项是打开日历的入口，保持可重复选择已应用的日期范围。
         value={selectedValue === "custom" ? "" : selectedValue}
-        onValueChange={(next: string) => choose(next as RangeKind | "custom")}
+        onValueChange={(next) => {
+          const selected = options.find((option) => option.value === next);
+          if (selected) choose(selected.value);
+        }}
       >
-        <SelectTrigger aria-label="时间范围" className="h-8 w-[180px] bg-panel text-12">
+        <SelectTrigger aria-label="时间范围" className="h-7 w-[148px] text-12">
           <SelectValue
             placeholder={`时间：${selectedLabel}`}
           >{`时间：${selectedLabel}`}</SelectValue>

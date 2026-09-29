@@ -1,7 +1,6 @@
 import { RUN_STATUSES } from "@fleet/core";
-import { CircleCheck, CircleSlash, CircleX, Clock3, Loader } from "lucide-react";
 import { describe, expect, it } from "vitest";
-import { STATUS_META } from "./status";
+import { RETRY_ICON_CLASS, STATUS_META } from "./status";
 
 describe("STATUS_META", () => {
   it("覆盖全部五种状态", () => {
@@ -10,31 +9,17 @@ describe("STATUS_META", () => {
     }
   });
 
-  it("中文词和图标一一对应", () => {
-    expect(STATUS_META.queued).toEqual({
-      label: "排队中",
-      icon: Clock3,
-      badgeClass: "text-status-queued",
+  it("中文词和图标颜色一一对应", () => {
+    expect(STATUS_META).toEqual({
+      queued: { label: "排队中", iconClass: "text-status-queued" },
+      running: { label: "工作中", iconClass: "text-status-running" },
+      completed: { label: "已完成", iconClass: "text-status-done" },
+      failed: { label: "失败", iconClass: "text-status-failed" },
+      cancelled: { label: "已取消", iconClass: "text-status-cancelled" },
     });
-    expect(STATUS_META.running).toEqual({
-      label: "工作中",
-      icon: Loader,
-      badgeClass: "text-status-running",
-    });
-    expect(STATUS_META.completed).toEqual({
-      label: "已完成",
-      icon: CircleCheck,
-      badgeClass: "text-status-done",
-    });
-    expect(STATUS_META.failed).toEqual({
-      label: "失败",
-      icon: CircleX,
-      badgeClass: "text-status-failed",
-    });
-    expect(STATUS_META.cancelled).toEqual({
-      label: "已取消",
-      icon: CircleSlash,
-      badgeClass: "text-status-cancelled",
-    });
+  });
+
+  it("重试中用警告色", () => {
+    expect(RETRY_ICON_CLASS).toBe("text-status-warning");
   });
 });

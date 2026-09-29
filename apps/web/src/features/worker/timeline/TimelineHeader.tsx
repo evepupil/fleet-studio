@@ -26,9 +26,9 @@ export function TimelineHeader({ counts, filter, onFilterChange }: TimelineHeade
   return (
     <div
       data-timeline-header
-      className="sticky top-0 z-[var(--z-sticky)] flex items-center gap-3 border-b border-line bg-panel py-2.5"
+      className="sticky top-0 z-[var(--z-sticky)] flex h-10 items-center gap-3 border-b border-line bg-panel max-md:h-auto max-md:flex-wrap max-md:py-2"
     >
-      <h2 className="m-0 text-14 font-semibold text-fg-1">时间线</h2>
+      <h2 className="text-13 font-medium text-fg-1">时间线</h2>
       <span className="font-mono text-12 text-fg-3">{counts.all}</span>
       <span className="flex-1" aria-hidden />
       <TimelineFilterControl options={options} value={filter} onChange={onFilterChange} />

@@ -4,53 +4,49 @@ import { useNavigate } from "react-router";
 import { useReorderPools, useSetPoolEnabled } from "@/api/queries";
 import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useSnapshotStore } from "@/state/snapshotStore";
 import { DisablePoolDialog } from "./DisablePoolDialog";
 import { SlotsTableRow } from "./SlotsTableRow";
 
 const SKELETON_ROWS = [0, 1, 2, 3] as const;
 
-const HEADERS = [
-  { label: "优先级", className: "w-12" },
-  { label: "渠道 · 模型", className: "min-w-[148px]" },
-  { label: "占用", className: "w-[262px]" },
+/**
+ * 十列表头：宽度和对齐写在 th 上（第一格 pl-4、最后一格 pr-4，数字列右对齐）。
+ * 用完整类名映射，不拼接。
+ */
+const HEADERS: { label: string; className: string }[] = [
+  { label: "优先级", className: "w-16 pl-4" },
+  { label: "渠道 · 模型", className: "" },
+  { label: "占用", className: "w-[252px]" },
   { label: "已用", className: "w-20 text-right" },
-  { label: "点名排队", className: "w-16 text-right" },
-  { label: "24 小时成功率", className: "w-24 text-right" },
-  { label: "平均耗时", className: "w-20 text-right" },
-  { label: "今日用量", className: "w-[72px] text-right" },
+  { label: "点名排队", className: "w-20 text-right" },
+  { label: "24 小时成功率", className: "w-28 text-right" },
+  { label: "平均耗时", className: "w-24 text-right" },
+  { label: "今日用量", className: "w-20 text-right" },
   { label: "启用", className: "w-16" },
-  { label: "顺序", className: "w-[88px]" },
-] as const;
+  { label: "顺序", className: "w-[76px] pr-4" },
+];
 
-/** 快照还没到时画 4 行骨架，列宽和真表格对齐。 */
+/** 快照还没到时画 4 行骨架，每格一个 Skeleton，行高同真行。 */
 function SlotsTableSkeleton() {
   return (
-    <TableBody>
+    <tbody>
       {SKELETON_ROWS.map((row) => (
-        <TableRow key={`skeleton-${row}`} className="h-16 border-b border-line last:border-b-0">
+        <tr key={`skeleton-${row}`} className="h-14 border-b border-line">
           {HEADERS.map((header, columnIndex) => (
-            <TableCell key={header.label} className={`px-3 py-3 align-middle ${header.className}`}>
+            <td key={header.label} className={`px-3 align-middle ${header.className}`}>
               {columnIndex === 1 ? (
-                <Skeleton className="h-3.5 w-[120px]" />
+                <Skeleton className="h-3.5 w-[140px]" />
               ) : columnIndex === 2 ? (
                 <Skeleton className="h-4 w-[180px]" />
               ) : (
                 <Skeleton className="h-3.5 w-10" />
               )}
-            </TableCell>
+            </td>
           ))}
-        </TableRow>
+        </tr>
       ))}
-    </TableBody>
+    </tbody>
   );
 }
 
@@ -208,31 +204,27 @@ function SlotsTable() {
   }
 
   return (
-    <section
-      data-slots-table
-      className="min-w-0 overflow-hidden rounded-lg border border-line bg-panel"
-    >
+    <section data-slots-table className="min-w-0">
       <div className="overflow-x-auto">
-        <Table className="table-fixed w-full min-w-[960px]">
-          <TableHeader className="[&_tr]:border-b [&_tr]:border-line">
-            <TableRow className="h-10 border-b border-line hover:bg-transparent">
+        {/* 原生 table：通栏、无外框卡片，行间只有 1px 细线；窄屏在自己的容器里横向滚动。 */}
+        <table className="w-full min-w-[1120px] table-fixed border-collapse text-13">
+          <thead>
+            <tr className="h-8">
               {HEADERS.map((header) => (
-                <TableHead
+                <th
                   key={header.label}
-                  // TableHead 内建类里有 `text-foreground`，而 twMerge 把自定义的 `text-12` 和 `text-fg-*`
-                  // 都归到「文字颜色」组，同组只留最后一个 —— 写 `text-12 … text-fg-3` 字号会被吃掉。
-                  // 所以字号留在 th 上（只有它，不会和颜色撞组），颜色交给里面的 span。
-                  className={`h-10 px-3 text-12 font-medium ${header.className}`}
+                  scope="col"
+                  className={`border-b border-line px-3 text-left align-middle text-12 font-medium text-fg-3 ${header.className}`}
                 >
-                  <span className="text-fg-3">{header.label}</span>
-                </TableHead>
+                  {header.label}
+                </th>
               ))}
-            </TableRow>
-          </TableHeader>
+            </tr>
+          </thead>
           {pools === null ? (
             <SlotsTableSkeleton />
           ) : (
-            <TableBody>
+            <tbody>
               {pools.map((pool, index) => (
                 <SlotsTableRow
                   key={pool.id}
@@ -249,9 +241,9 @@ function SlotsTable() {
                   }}
                 />
               ))}
-            </TableBody>
+            </tbody>
           )}
-        </Table>
+        </table>
       </div>
       {pools !== null && pools.length === 0 ? <EmptyState message="还没有配置模型池" /> : null}
       <DisablePoolDialog

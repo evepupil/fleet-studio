@@ -4,8 +4,8 @@ import { useSnapshotStore } from "@/state/snapshotStore";
 import { useTaskFilterStore } from "@/state/taskFilterStore";
 
 /**
- * L1 公共排队：顶栏右侧的小胶囊。数字为 0（或快照还没到）时整个不渲染。
- * 点击等价于「从总览带着条件跳到任务页」——先按公共排队条件重置筛选，再跳转。
+ * L1 公共排队：视图栏右侧的小按钮。数字为 0（或快照还没到）时整个不渲染。
+ * 点击等价于「带着条件跳到任务列表」——先按公共排队条件重置筛选，再进列表视图。
  */
 function SharedQueuePill() {
   const sharedQueued = useSnapshotStore((state) => state.snapshot?.sharedQueued ?? 0);
@@ -21,14 +21,14 @@ function SharedQueuePill() {
       data-shared-queue
       type="button"
       aria-label={`公共排队 ${sharedQueued} 个，查看任务`}
-      className="inline-flex h-7 items-center gap-1.5 rounded-md border border-line bg-panel px-2.5 text-12 text-fg-2 transition-colors duration-[var(--dur-fast)] ease-[var(--ease)] hover:bg-hover"
+      className="inline-flex h-7 items-center gap-1.5 rounded-md border border-line bg-card px-2 text-12 text-fg-2 shadow-card transition-colors hover:bg-raised outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
       onClick={() => {
         applyFromOverview({ status: "queued" });
-        navigate("/tasks");
+        navigate("/tasks/list");
       }}
     >
       <Clock aria-hidden="true" className="size-3.5 text-fg-3" />
-      公共排队
+      <span className="max-md:sr-only">公共排队</span>
       <span className="font-mono text-fg-1">{sharedQueued}</span>
     </button>
   );

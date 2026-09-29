@@ -1,49 +1,61 @@
 /*
  * 设计令牌：唯一允许出现色值的文件。数值与 docs/前端设计.md 第 3 节逐一对应，改这里必须同步改文档。
- * 默认暗色；系统偏好浅色时切换为浅色值。
+ * 第三版（Linear 式工作台）：默认浅色；系统偏好深色时切换为深色值。
+ * 底色从外到里四层：窗口（浅灰）→ 工作区面板（近白）→ 看板列（淡灰托盘）→ 卡片（白）。
  */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* 中性色 */
-  --bg-page: #0b0c0e;
-  --bg-panel: #111214;
-  --bg-raised: #17181b;
-  --bg-overlay: #1c1d21;
-  --bg-hover: #16171a;
-  --bg-selected: #1b2333;
-  --line: #1f2023;
-  --line-strong: #2a2b30;
-  --meter-track: #1a1b1e;
-  --text-1: #ececee;
-  --text-2: #a3a3ab;
-  --text-3: #8b8b94;
-  --accent: #6b9eff;
-  --accent-soft: rgba(107, 158, 255, 0.16);
-  --on-accent: #0b0c0e;
+  /* 底色层级 */
+  --bg-window: #f2f2f3;
+  --bg-panel: #fbfbfb;
+  --bg-column: #f4f4f5;
+  --bg-card: #ffffff;
+  --bg-raised: #f6f6f7;
+  --bg-overlay: #ffffff;
+  --bg-hover: rgba(20, 21, 26, 0.045);
+  --bg-selected: rgba(20, 21, 26, 0.07);
 
-  /* 状态色 */
-  --st-queued: #a3a3ab;
-  --st-running: #6ea8fe;
-  --st-done: #4cc38a;
-  --st-failed: #ff7070;
-  --st-cancelled: #8b8b94;
-  --st-warning: #f2b544;
-  --st-warning-soft: rgba(242, 181, 68, 0.09);
-  --st-failed-soft: rgba(255, 112, 112, 0.09);
+  /* 线条 */
+  --line: #e5e5e8;
+  --line-strong: #d3d3d8;
+  --meter-track: #ececee;
 
-  /* 项目色：8 个固定顺序的分类色，只画在容量格和色点上 */
-  --proj-0: #3987e5;
-  --proj-1: #d95926;
-  --proj-2: #199e70;
-  --proj-3: #c98500;
-  --proj-4: #d55181;
+  /* 文字：三级灰阶。text-3 不放在 --bg-selected 上（那里改用 text-2） */
+  --text-1: #1d1e22;
+  --text-2: #5a5c66;
+  --text-3: #676974;
+
+  /* 强调色：只给焦点环、开关打开、链接式按钮、主按钮、分段切换选中项 */
+  --accent: #3f5fd6;
+  --accent-soft: rgba(63, 95, 214, 0.1);
+  --on-accent: #ffffff;
+
+  /* 产品标记（团队）绿 */
+  --team: #2e9d5b;
+
+  /* 状态色：图标用。running、queued、cancelled 只做图形，不做文字；warning、done、failed 可做文字 */
+  --st-queued: #8b8d96;
+  --st-running: #d9a300;
+  --st-warning: #a95500;
+  --st-done: #7652d6;
+  --st-failed: #c8372f;
+  --st-cancelled: #8f919a;
+  --st-warning-soft: rgba(169, 85, 0, 0.08);
+  --st-failed-soft: rgba(200, 55, 47, 0.07);
+
+  /* 项目色：8 个固定顺序的分类色，只画在标签色点、占用格子和图例上 */
+  --proj-0: #2a78d6;
+  --proj-1: #eb6834;
+  --proj-2: #1baf7a;
+  --proj-3: #eda100;
+  --proj-4: #e87ba4;
   --proj-5: #008300;
-  --proj-6: #9085e9;
-  --proj-7: #e66767;
+  --proj-6: #4a3aa7;
+  --proj-7: #e34948;
 
-  /* 图表系列色：顺序与项目色一致；「其他」单独一色；网格线同发丝线 */
+  /* 图表系列色：顺序与项目色一致；「其他」单独一色；网格线同细线 */
   --series-0: var(--proj-0);
   --series-1: var(--proj-1);
   --series-2: var(--proj-2);
@@ -52,41 +64,36 @@
   --series-5: var(--proj-5);
   --series-6: var(--proj-6);
   --series-7: var(--proj-7);
-  --series-other: #4a4b52;
+  --series-other: #c9c9ce;
   --chart-grid: var(--line);
 
-  /* 确认框背后的遮罩 */
-  --scrim: rgba(0, 0, 0, 0.5);
+  /* 弹窗和抽屉背后的遮罩 */
+  --scrim: rgba(20, 21, 26, 0.25);
 
   /* 重试斜纹：叠在项目色上的半透明细线 */
-  --hatch: rgba(11, 12, 14, 0.55);
+  --hatch: rgba(255, 255, 255, 0.6);
 
-  /* 阴影：只有悬浮提示卡使用 */
-  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px #2a2b30;
+  /* 阴影：卡片很浅；工作区面板更浅；弹出层（菜单、提示卡、弹窗）稍重并带一圈细线 */
+  --shadow-card: 0 1px 2px rgba(20, 21, 26, 0.05);
+  --shadow-panel: 0 1px 3px rgba(20, 21, 26, 0.04);
+  --shadow-overlay: 0 8px 24px rgba(20, 21, 26, 0.1), 0 0 0 1px #e5e5e8;
 
   /* 字体 */
   --font-sans:
     "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
   --font-mono: "Cascadia Mono", "JetBrains Mono", Consolas, "Microsoft YaHei UI", monospace;
 
-  /* 字阶：字号 / 行高 */
-  --fs-11: 11px;
-  --lh-11: 16px;
+  /* 字阶：字号 / 行高。正文 13/17，辅助 12/16 */
   --fs-12: 12px;
-  --lh-12: 18px;
+  --lh-12: 16px;
   --fs-13: 13px;
-  --lh-13: 20px;
+  --lh-13: 17px;
   --fs-14: 14px;
   --lh-14: 20px;
   --fs-16: 16px;
-  --lh-16: 24px;
-  --fs-22: 22px;
-  --lh-22: 28px;
-  --fs-28: 28px;
-  --lh-28: 36px;
+  --lh-16: 22px;
   --fw-regular: 400;
   --fw-medium: 500;
-  --fw-semibold: 600;
 
   /* 间距（4px 基准） */
   --sp-1: 4px;
@@ -97,28 +104,35 @@
   --sp-6: 24px;
   --sp-8: 32px;
 
-  /* 圆角 */
-  --r-slot: 3px;
-  --r-sm: 4px;
-  --r-md: 6px;
-  --r-lg: 8px;
+  /* 圆角：标签 4、控件 5、卡片与面板 6、占用格 2 */
+  --r-chip: 4px;
+  --r-control: 5px;
+  --r-card: 6px;
+  --r-slot: 2px;
 
-  /* 尺寸（第二版控制台骨架） */
-  --appbar-h: 40px;
+  /* 图标描边 */
+  --icon-stroke: 1.7;
+
+  /* 骨架尺寸 */
+  --window-bar-h: 38px;
+  --sidebar-w: 240px;
+  --view-bar-h: 40px;
+  --filter-bar-h: 40px;
   --banner-h: 32px;
-  --sidebar-w: 220px;
-  --sidebar-w-collapsed: 64px;
-  --header-h: 56px;
-  --content-pad: 24px;
-  --card-gap: 16px;
-  --card-pad: 20px;
-  --slot-h: 18px;
+  --nav-item-h: 28px;
+  --control-h: 28px;
+  --control-h-sm: 24px;
+  --label-h: 20px;
+  --board-col-min: 264px;
+  --ended-col-w: 208px;
+  --detail-aside-w: 280px;
+  --slot-h: 16px;
   --slot-gap: 2px;
 
   /* 层级 */
   --z-sticky: 10;
   --z-banner: 20;
-  --z-tooltip: 30;
+  --z-overlay: 30;
 
   /* 动效 */
   --dur-fast: 120ms;
@@ -126,49 +140,58 @@
   --ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    color-scheme: light;
+    color-scheme: dark;
 
-    --bg-page: #f6f6f3;
-    --bg-panel: #ffffff;
-    --bg-raised: #fafaf8;
-    --bg-overlay: #ffffff;
-    --bg-hover: #f1f0ec;
-    --bg-selected: #eaf0fe;
-    --line: #e6e5e0;
-    --line-strong: #d6d5cf;
-    --meter-track: #efeee9;
-    --text-1: #1a1a18;
-    --text-2: #55544f;
-    --text-3: #696862;
-    --accent: #2f5fd0;
-    --accent-soft: rgba(47, 95, 208, 0.1);
-    --on-accent: #ffffff;
+    --bg-window: #0f0f11;
+    --bg-panel: #151517;
+    --bg-column: #1a1a1d;
+    --bg-card: #1e1e21;
+    --bg-raised: #222226;
+    --bg-overlay: #222226;
+    --bg-hover: rgba(255, 255, 255, 0.05);
+    --bg-selected: rgba(255, 255, 255, 0.08);
 
-    --st-queued: #55544f;
-    --st-running: #2563d6;
-    --st-done: #13773a;
-    --st-failed: #c62f2f;
-    --st-cancelled: #696862;
-    --st-warning: #8c5a00;
-    --st-warning-soft: rgba(140, 90, 0, 0.08);
-    --st-failed-soft: rgba(198, 47, 47, 0.07);
+    --line: #2a2a2e;
+    --line-strong: #3a3a40;
+    --meter-track: #26262a;
 
-    --proj-0: #2a78d6;
-    --proj-1: #eb6834;
-    --proj-2: #1baf7a;
-    --proj-3: #eda100;
-    --proj-4: #e87ba4;
+    --text-1: #ededef;
+    --text-2: #a9aab2;
+    --text-3: #8e8f98;
+
+    --accent: #7f9cff;
+    --accent-soft: rgba(127, 156, 255, 0.16);
+    --on-accent: #0f0f11;
+
+    --team: #3db070;
+
+    --st-queued: #8e8f98;
+    --st-running: #e8b400;
+    --st-warning: #f0893a;
+    --st-done: #a58cf7;
+    --st-failed: #f2675e;
+    --st-cancelled: #76777f;
+    --st-warning-soft: rgba(240, 137, 58, 0.12);
+    --st-failed-soft: rgba(242, 103, 94, 0.1);
+
+    --proj-0: #3987e5;
+    --proj-1: #d95926;
+    --proj-2: #199e70;
+    --proj-3: #c98500;
+    --proj-4: #d55181;
     --proj-5: #008300;
-    --proj-6: #4a3aa7;
-    --proj-7: #e34948;
+    --proj-6: #9085e9;
+    --proj-7: #e66767;
 
-    --series-other: #c9c8c2;
-    --scrim: rgba(20, 20, 18, 0.3);
+    --series-other: #4a4b52;
+    --scrim: rgba(0, 0, 0, 0.5);
 
-    --hatch: rgba(255, 255, 255, 0.6);
+    --hatch: rgba(15, 15, 17, 0.55);
 
-    --shadow-overlay: 0 8px 24px rgba(20, 20, 18, 0.12), 0 0 0 1px #e6e5e0;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-panel: 0 0 0 0 transparent;
+    --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px #2a2a2e;
   }
 }

@@ -42,14 +42,14 @@ export function RunDivider({ row, now, expanded, onToggle }: RunDividerProps) {
         <div className="mt-2 border-l-2 border-line-strong bg-raised px-3 py-2">
           <p
             data-expanded={expanded ? "true" : "false"}
-            className={`m-0 text-13 wrap-anywhere whitespace-pre-wrap text-fg-1 ${expanded ? "" : "line-clamp-6"}`}
+            className={`m-0 text-13 break-words whitespace-pre-wrap text-fg-1 ${expanded ? "" : "line-clamp-6"}`}
           >
             {row.prompt}
           </p>
           {overflow && (
             <button
               type="button"
-              className="mt-1 inline-block text-12 text-brand hover:underline"
+              className="mt-1 inline-block text-12 text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
               aria-expanded={expanded}
               onClick={() => onToggle(row.key)}
             >

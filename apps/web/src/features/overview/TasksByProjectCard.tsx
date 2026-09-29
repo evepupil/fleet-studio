@@ -4,7 +4,7 @@ import { Cell, Pie, PieChart } from "recharts";
 import { useStats } from "@/api/queries";
 import { ColorDot } from "@/components/ColorDot";
 import { EmptyState } from "@/components/EmptyState";
-import { SectionCard } from "@/components/SectionCard";
+import { Panel } from "@/components/Panel";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -21,10 +21,11 @@ import { formatCompact, formatDuration, formatPercent, formatTokens } from "@/li
 import { useOverviewStore } from "@/state/overviewStore";
 import { useTaskFilterStore } from "@/state/taskFilterStore";
 
+/** 「其他」行不可点：完整类名映射，避免拼接类名。 */
 const PROJECT_ROW_CLASSES = {
   interactive:
-    "cursor-pointer hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
-  other: "hover:bg-transparent",
+    "h-8 cursor-pointer hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+  other: "h-8 hover:bg-transparent",
 };
 
 function TasksByProjectCard() {
@@ -46,15 +47,15 @@ function TasksByProjectCard() {
     if (item.isOther) return;
     // 项目分布沿用当前时间范围，并重置任务页已有筛选。
     applyFromOverview({ status: "all", range: overviewState.range, project: item.key });
-    navigate("/tasks");
+    navigate("/tasks/list");
   }
 
   return (
     <div data-tasks-by-project className="h-full min-w-0">
-      <SectionCard data-section="tasks-by-project" title="任务次数分布" className="h-full">
+      <Panel data-section="tasks-by-project" title="任务次数分布" className="h-full">
         {loading ? (
           <div className="grid min-w-0 grid-cols-1 items-center gap-6 md:grid-cols-[160px_minmax(0,1fr)]">
-            <Skeleton className="h-40 w-40 justify-self-center rounded-full" />
+            <Skeleton className="size-40 justify-self-center rounded-full" />
             <div className="space-y-2">
               {["one", "two", "three", "four", "five"].map((key) => (
                 <Skeleton key={key} className="h-5 w-full" />
@@ -68,9 +69,9 @@ function TasksByProjectCard() {
             <div
               role="img"
               aria-label={`任务次数分布，按项目，共 ${items.length} 项`}
-              className="relative h-40 w-40 shrink-0 justify-self-center"
+              className="relative size-40 shrink-0 justify-self-center"
             >
-              <ChartContainer config={chartConfig} className="h-40 w-40 aspect-square">
+              <ChartContainer config={chartConfig} className="size-40">
                 <PieChart>
                   <ChartTooltip
                     content={
@@ -94,7 +95,7 @@ function TasksByProjectCard() {
                     innerRadius={52}
                     outerRadius={80}
                     paddingAngle={0}
-                    stroke="var(--bg-panel)"
+                    stroke="var(--bg-card)"
                     strokeWidth={2}
                     isAnimationActive={false}
                   >
@@ -108,24 +109,26 @@ function TasksByProjectCard() {
                 </PieChart>
               </ChartContainer>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-mono text-22 font-semibold text-fg-1">
+                <span className="font-mono text-16 font-medium text-fg-1">
                   {formatCompact(totalTasks)}
                 </span>
-                <span className="text-11 text-fg-3">任务</span>
+                <span className="text-12 text-fg-3">任务</span>
               </div>
             </div>
-            <Table className="table-fixed w-full text-13">
+            <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-12 font-medium text-fg-3">项目</TableHead>
-                  <TableHead className="w-16 text-right text-12 font-medium text-fg-3">
-                    任务数
+                  <TableHead>
+                    <span className="text-12 font-medium text-fg-3">项目</span>
                   </TableHead>
-                  <TableHead className="w-[88px] text-right text-12 font-medium text-fg-3">
-                    总耗时
+                  <TableHead className="w-16 text-right">
+                    <span className="text-12 font-medium text-fg-3">任务数</span>
                   </TableHead>
-                  <TableHead className="hidden w-20 text-right text-12 font-medium text-fg-3 xl:table-cell">
-                    token
+                  <TableHead className="w-[88px] text-right">
+                    <span className="text-12 font-medium text-fg-3">总耗时</span>
+                  </TableHead>
+                  <TableHead className="hidden w-20 text-right 2xl:table-cell">
+                    <span className="text-12 font-medium text-fg-3">token</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -160,13 +163,13 @@ function TasksByProjectCard() {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="w-16 text-right font-mono tabular-nums">
+                    <TableCell className="w-16 text-right font-mono text-12 tabular-nums">
                       {formatCompact(item.tasks)}
                     </TableCell>
-                    <TableCell className="w-[88px] text-right font-mono tabular-nums">
+                    <TableCell className="w-[88px] text-right font-mono text-12 tabular-nums">
                       {formatDuration(item.runMs)}
                     </TableCell>
-                    <TableCell className="hidden w-20 text-right font-mono tabular-nums xl:table-cell">
+                    <TableCell className="hidden w-20 text-right font-mono text-12 tabular-nums 2xl:table-cell">
                       {formatTokens(item.tokens)}
                     </TableCell>
                   </TableRow>
@@ -175,7 +178,7 @@ function TasksByProjectCard() {
             </Table>
           </div>
         )}
-      </SectionCard>
+      </Panel>
     </div>
   );
 }

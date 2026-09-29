@@ -1,26 +1,29 @@
 #!/usr/bin/env node
 /**
- * 门禁脚本：扫描 apps/web/src 下的样式和源码，禁止写死的颜色值。
+ * 门禁脚本：扫描 apps/web/src 下的样式和源码，禁止写死的颜色值及淘汰的 Tailwind 类名。
  * 所有颜色必须来自 apps/web/src/styles/tokens.css 的 CSS 变量，因此这个文件本身跳过检查。
  * 只用 Node 内置模块，不依赖任何第三方包。
  */
 import { readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { extname, join, relative } from "node:path";
 
 const ROOT = process.cwd();
 const SCAN_DIR = join(ROOT, "apps", "web", "src");
 const SKIP_FILE = join(SCAN_DIR, "styles", "tokens.css");
 const SCAN_EXTENSIONS = new Set([".css", ".ts", ".tsx"]);
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx"]);
 
-/** 紧跟在候选十六进制色值后面、会让它其实是更长标识符（选择器、URL 片段等）的字符。 */
+/** 紧跟在候选十六进制色值后面的字符如果属于标识符，则它不是独立色值。 */
 const IDENTIFIER_CHAR_PATTERN = /[A-Za-z0-9_-]/;
-/** 合法的十六进制颜色写法：#rgb、#rgba、#rrggbb、#rrggbbaa */
 const VALID_HEX_LENGTHS = new Set([3, 4, 6, 8]);
 const HEX_COLOR_PATTERN = /#([0-9a-fA-F]+)/g;
-/** 函数式颜色写法，前面必须是非标识符字符（或行首），避免匹配到 myRgba( 之类的标识符尾部 */
 const FUNCTIONAL_COLOR_PATTERN = /\b(?:rgb|rgba|hsl|hsla|oklch|oklab)\(/gi;
+const PALETTE_CLASS_PATTERN =
+  /\b(?:bg|text|border|ring|outline|fill|stroke|from|via|to|divide|placeholder|decoration|caret|accent|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b|\b(?:bg|text|border|fill|stroke)-(?:white|black)\b/g;
+const BRACKET_COLOR_PATTERN = /-\[(?:#|rgb|rgba|hsl|hsla|oklch)/gi;
+const DEPRECATED_CLASS_PATTERN =
+  /\btext-(?:11|22|28|xs|sm|base|lg|xl|2xl|3xl)\b|\bfont-(?:semibold|bold|extrabold|black)\b|\b(?:bg|text|border)-page\b|\bshadow-none\b/g;
 
-/** 递归收集目录下所有目标扩展名的文件（绝对路径）。 */
 function collectFiles(dir) {
   const results = [];
   let entries;
@@ -35,36 +38,30 @@ function collectFiles(dir) {
       results.push(...collectFiles(fullPath));
       continue;
     }
-    const dotIndex = entry.name.lastIndexOf(".");
-    const ext = dotIndex === -1 ? "" : entry.name.slice(dotIndex);
-    if (entry.isFile() && SCAN_EXTENSIONS.has(ext)) {
+    if (entry.isFile() && SCAN_EXTENSIONS.has(extname(entry.name))) {
       results.push(fullPath);
     }
   }
   return results;
 }
 
-/** 一行文字里命中的写死颜色片段，每处命中单独一条。 */
 function findHardcodedColors(line) {
   const hits = [];
-
   for (const hexMatch of line.matchAll(HEX_COLOR_PATTERN)) {
     const hex = hexMatch[1] ?? "";
-    if (!VALID_HEX_LENGTHS.has(hex.length)) {
-      continue;
-    }
+    if (!VALID_HEX_LENGTHS.has(hex.length)) continue;
     const nextChar = line[hexMatch.index + hexMatch[0].length];
-    if (nextChar !== undefined && IDENTIFIER_CHAR_PATTERN.test(nextChar)) {
-      continue;
-    }
+    if (nextChar !== undefined && IDENTIFIER_CHAR_PATTERN.test(nextChar)) continue;
     hits.push(hexMatch[0]);
   }
-
   for (const fnMatch of line.matchAll(FUNCTIONAL_COLOR_PATTERN)) {
     hits.push(fnMatch[0]);
   }
-
   return hits;
+}
+
+function findMatches(line, pattern) {
+  return [...line.matchAll(pattern)].map((match) => match[0]);
 }
 
 function main() {
@@ -75,9 +72,17 @@ function main() {
     const content = readFileSync(file, "utf8");
     const lines = content.split(/\r?\n/);
     const relPath = relative(ROOT, file).replace(/\\/g, "/");
+    const checkUtilityClasses = SOURCE_EXTENSIONS.has(extname(file));
 
     lines.forEach((line, index) => {
       const hits = findHardcodedColors(line);
+      if (checkUtilityClasses) {
+        hits.push(
+          ...findMatches(line, PALETTE_CLASS_PATTERN),
+          ...findMatches(line, BRACKET_COLOR_PATTERN),
+          ...findMatches(line, DEPRECATED_CLASS_PATTERN),
+        );
+      }
       for (const hit of hits) {
         findings.push(`${relPath}:${index + 1}: ${line.trim()} (${hit})`);
       }
@@ -85,16 +90,12 @@ function main() {
   }
 
   if (findings.length > 0) {
-    for (const finding of findings) {
-      console.log(finding);
-    }
-    console.error(
-      `check-tokens: 发现 ${findings.length} 处写死的颜色值，请改用 tokens.css 里的变量`,
-    );
+    for (const finding of findings) console.log(finding);
+    console.error(`check-tokens: 发现 ${findings.length} 处禁用的颜色或工具类`);
     process.exit(1);
   }
 
-  console.log("check-tokens: 未发现写死的颜色值");
+  console.log("check-tokens: 未发现禁用的颜色或工具类");
   process.exit(0);
 }
 

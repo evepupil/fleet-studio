@@ -1,33 +1,36 @@
 import { create } from "zustand";
 
 interface SidebarState {
-  collapsed: boolean;
-  setCollapsed(collapsed: boolean): void;
+  open: boolean;
+  drawerOpen: boolean;
+  setOpen(value: boolean): void;
   toggle(): void;
+  setDrawerOpen(value: boolean): void;
 }
 
-function readCollapsed(): boolean {
-  if (typeof localStorage === "undefined") {
-    return false;
-  }
-  return localStorage.getItem("fleet.sidebar") === "collapsed";
+function readOpen(): boolean {
+  if (typeof localStorage === "undefined") return true;
+  const value = localStorage.getItem("fleet.sidebar");
+  return value !== "closed" && value !== "collapsed";
 }
 
-function persistCollapsed(collapsed: boolean): void {
+function persistOpen(open: boolean): void {
   if (typeof localStorage !== "undefined") {
-    localStorage.setItem("fleet.sidebar", collapsed ? "collapsed" : "expanded");
+    localStorage.setItem("fleet.sidebar", open ? "open" : "closed");
   }
 }
 
 export const useSidebarStore = create<SidebarState>((set, get) => ({
-  collapsed: readCollapsed(),
-  setCollapsed: (collapsed) => {
-    persistCollapsed(collapsed);
-    set({ collapsed });
+  open: readOpen(),
+  drawerOpen: false,
+  setOpen: (open) => {
+    persistOpen(open);
+    set({ open });
   },
   toggle: () => {
-    const collapsed = !get().collapsed;
-    persistCollapsed(collapsed);
-    set({ collapsed });
+    const open = !get().open;
+    persistOpen(open);
+    set({ open });
   },
+  setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
 }));

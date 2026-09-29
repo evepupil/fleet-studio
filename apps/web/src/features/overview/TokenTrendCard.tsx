@@ -3,7 +3,7 @@ import { useState } from "react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { useStats } from "@/api/queries";
 import { DimensionTabs } from "@/components/DimensionTabs";
-import { SectionCard } from "@/components/SectionCard";
+import { Panel } from "@/components/Panel";
 import { SeriesLegend } from "@/components/SeriesLegend";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +18,11 @@ const DIMENSION_LABELS: Record<StatsDimension, string> = {
   project: "项目",
   role: "角色",
 };
+const GRANULARITY_LABELS = {
+  hour: "按小时",
+  day: "按天",
+  week: "按周",
+} as const;
 const EMPTY_HIDDEN_KEYS: ReadonlySet<string> = new Set();
 
 function seriesKey(series: TrendSeries): string {
@@ -62,6 +67,7 @@ function TokenTrendCard() {
   });
 
   function toggleSeries(key: string): void {
+    // 图例是可见性开关；最后一条可见线不许关掉，避免图被清空。
     const visibleCount = series.filter((item) => !hiddenKeys.has(seriesKey(item))).length;
     if (!hiddenKeys.has(key) && visibleCount <= 1) return;
     setHiddenState((current) => {
@@ -79,15 +85,22 @@ function TokenTrendCard() {
 
   return (
     <div data-token-trend className="min-w-0">
-      <SectionCard
+      <Panel
         data-section="token-trend"
         title="token 趋势"
+        titleExtra={
+          data ? (
+            <span data-granularity={data.granularity} className="text-12 text-fg-3">
+              {GRANULARITY_LABELS[data.granularity]}
+            </span>
+          ) : undefined
+        }
         right={
           <DimensionTabs value={overviewState.dimension} onChange={overviewState.setDimension} />
         }
       >
         {loading ? (
-          <Skeleton className="h-[280px] w-full max-[799px]:h-[220px]" />
+          <Skeleton className="h-[260px] w-full max-md:h-[200px]" />
         ) : (
           <>
             <div className="mb-3">
@@ -97,10 +110,7 @@ function TokenTrendCard() {
               role="img"
               aria-label={`token 趋势，按${DIMENSION_LABELS[overviewState.dimension]}，${series.length} 条线，${buckets.length} 个时间段`}
             >
-              <ChartContainer
-                config={chartConfig}
-                className="h-[280px] w-full max-[799px]:h-[220px]"
-              >
+              <ChartContainer config={chartConfig} className="h-[260px] w-full max-md:h-[200px]">
                 <LineChart data={chartData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
                   <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
                   <XAxis
@@ -109,14 +119,14 @@ function TokenTrendCard() {
                     axisLine={false}
                     tickMargin={8}
                     minTickGap={24}
-                    tick={{ fill: "var(--text-3)", fontSize: 11 }}
+                    tick={{ fill: "var(--text-3)", fontSize: 12 }}
                     tickFormatter={(value) => formatBucketLabel(String(value), granularity)}
                   />
                   <YAxis
                     tickLine={false}
                     axisLine={false}
                     width={48}
-                    tick={{ fill: "var(--text-3)", fontSize: 11 }}
+                    tick={{ fill: "var(--text-3)", fontSize: 12 }}
                     tickFormatter={(value) => formatTokens(Number(value))}
                   />
                   <ChartTooltip
@@ -138,13 +148,13 @@ function TokenTrendCard() {
                       dot={{
                         r: 3,
                         fill: seriesColorVar(item.colorIndex),
-                        stroke: "var(--bg-panel)",
+                        stroke: "var(--bg-card)",
                         strokeWidth: 1,
                       }}
                       activeDot={{
                         r: 5,
                         fill: seriesColorVar(item.colorIndex),
-                        stroke: "var(--bg-panel)",
+                        stroke: "var(--bg-card)",
                         strokeWidth: 2,
                       }}
                       isAnimationActive={false}
@@ -154,32 +164,34 @@ function TokenTrendCard() {
                 </LineChart>
               </ChartContainer>
             </div>
-            <table className="sr-only">
-              <caption>token 趋势明细</caption>
-              <thead>
-                <tr>
-                  <th scope="col">时间段</th>
-                  {series.map((item) => (
-                    <th key={seriesKey(item)} scope="col">
-                      {item.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {buckets.map((bucket, index) => (
-                  <tr key={bucket}>
-                    <th scope="row">{formatBucketTitle(bucket, granularity)}</th>
+            <div className="sr-only">
+              <table>
+                <caption>token 趋势明细</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">时间段</th>
                     {series.map((item) => (
-                      <td key={seriesKey(item)}>{formatTokens(item.points[index] ?? 0)}</td>
+                      <th key={seriesKey(item)} scope="col">
+                        {item.label}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {buckets.map((bucket, index) => (
+                    <tr key={bucket}>
+                      <th scope="row">{formatBucketTitle(bucket, granularity)}</th>
+                      {series.map((item) => (
+                        <td key={seriesKey(item)}>{formatTokens(item.points[index] ?? 0)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
-      </SectionCard>
+      </Panel>
     </div>
   );
 }

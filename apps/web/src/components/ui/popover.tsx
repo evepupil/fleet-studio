@@ -25,7 +25,7 @@ function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "z-[var(--z-tooltip)] w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-(--shadow-overlay) outline-hidden data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[var(--dur-fast)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-[var(--dur-base)]",
+          "z-[var(--z-overlay)] w-72 rounded-lg border border-line bg-overlay p-3 text-12 text-fg-1 shadow-overlay outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[var(--dur-fast)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-[var(--dur-base)]",
           className,
         )}
         {...props}
@@ -49,17 +49,11 @@ function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function PopoverTitle({ className, ...props }: React.ComponentProps<"h2">) {
-  return <div data-slot="popover-title" className={cn("font-medium", className)} {...props} />;
+  return <h2 data-slot="popover-title" className={cn("font-medium", className)} {...props} />;
 }
 
 function PopoverDescription({ className, ...props }: React.ComponentProps<"p">) {
-  return (
-    <p
-      data-slot="popover-description"
-      className={cn("text-muted-foreground", className)}
-      {...props}
-    />
-  );
+  return <p data-slot="popover-description" className={cn("text-fg-2", className)} {...props} />;
 }
 
 export {

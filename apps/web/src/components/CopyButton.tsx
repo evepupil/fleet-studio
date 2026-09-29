@@ -35,12 +35,15 @@ function CopyButton({ text, label, showText = false }: CopyButtonProps) {
     <Button
       type="button"
       variant="ghost"
-      size="xs"
+      size={showText ? "sm" : "icon-sm"}
       aria-label={label}
       title={label}
       onClick={() => void copy()}
     >
-      <Icon aria-hidden="true" className={copied ? "text-status-done" : "text-fg-3"} />
+      <Icon
+        aria-hidden="true"
+        className={`size-3.5 ${copied ? "text-status-done" : "text-fg-3"}`}
+      />
       {showText ? <span className="font-mono text-12">{text}</span> : null}
     </Button>
   );
