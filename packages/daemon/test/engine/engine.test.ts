@@ -1,8 +1,9 @@
 import { appendFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEngine } from "../../src/engine/engine.js";
+import * as runTracker from "../../src/engine/runTracker.js";
 import type { EngineDeps } from "../../src/engine/types.js";
 import { createRepos } from "../../src/store/createRepos.js";
 import type { Repos } from "../../src/store/types.js";
@@ -142,6 +143,56 @@ describe("createEngine：组装与生命周期（模块设计 3.1）", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(harness.repos.runs.get(run.id)?.status).toBe("queued");
+  });
+
+  it("slow tracker polls never overlap, and stop waits for the active poll", async () => {
+    harness = await createHarness();
+    const worker = createWorkerRecord();
+    const run = createRunRecord({
+      status: "running",
+      startedAt: new Date().toISOString(),
+      pid: 4321,
+    });
+    harness.repos.projects.insert(
+      createProjectRecord({ key: worker.projectKey, path: worker.cwd }),
+    );
+    harness.repos.workers.insert(worker);
+    harness.repos.runs.insert(run);
+    harness.host.registerExistingProcess(4321, true);
+    let release: (done: boolean) => void = () => {};
+    const gate = new Promise<boolean>((resolve) => {
+      release = resolve;
+    });
+    const poll = vi.fn(() => gate);
+    const spy = vi.spyOn(runTracker, "createRunTracker").mockReturnValue({
+      runId: run.id,
+      workerId: worker.id,
+      isAdopted: true,
+      poll,
+      handleExit: async () => {},
+    });
+    vi.useFakeTimers();
+    const engine = createEngine(harness.deps);
+    try {
+      await engine.start();
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(poll).toHaveBeenCalledTimes(1);
+      let stopped = false;
+      const stopping = engine.stop().then(() => {
+        stopped = true;
+      });
+      await vi.advanceTimersByTimeAsync(200);
+      expect(stopped).toBe(false);
+      release(false);
+      await stopping;
+      await vi.advanceTimersByTimeAsync(200);
+      expect(poll).toHaveBeenCalledTimes(1);
+    } finally {
+      release(false);
+      await engine.stop();
+      spy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it("F6b 回归：接管在顶层抛错时不阻止启动，只记日志", async () => {

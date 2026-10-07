@@ -109,6 +109,7 @@ export function createEngine(deps: EngineDeps): Engine {
   let timeoutSweepTimer: ReturnType<typeof setInterval> | null = null;
   let retentionSweepTimer: ReturnType<typeof setInterval> | null = null;
   let unsubscribeConfig: (() => void) | null = null;
+  let trackerPolling: Promise<void> | null = null;
 
   async function pollAllTrackers(): Promise<void> {
     const nowMs = ctx.now();
@@ -215,7 +216,10 @@ export function createEngine(deps: EngineDeps): Engine {
         ctx.requestDispatch();
       }, intervals.dispatchFallbackMs);
       trackerPollTimer = setInterval(() => {
-        void pollAllTrackers();
+        if (trackerPolling !== null) return;
+        trackerPolling = pollAllTrackers().finally(() => {
+          trackerPolling = null;
+        });
       }, intervals.trackerPollMs);
       timeoutSweepTimer = setInterval(() => {
         void runTimeoutSweep(ctx).catch((error) => deps.logger.error("超时检查出错", error));
@@ -248,6 +252,7 @@ export function createEngine(deps: EngineDeps): Engine {
         unsubscribeConfig();
         unsubscribeConfig = null;
       }
+      await trackerPolling;
       // 放弃跟踪，不结束任何进程：苦工继续在后台跑，等下次启动时被 recovery 接管。
       ctx.trackers.clear();
     },
