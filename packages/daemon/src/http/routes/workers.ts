@@ -6,14 +6,14 @@ import {
   sendRequestSchema,
   submitRequestSchema,
   type TimelineEvent,
-  type TimelineStreamPayload,
   timelineQuerySchema,
 } from "@fleet/core";
 import { streamSSE } from "hono/streaming";
 import type { HttpApp, HttpAppDeps } from "../createApp.js";
 import { parseOrThrow } from "../errors.js";
 import { readJsonBody, requireCliToken } from "../guards.js";
-import { createTrailingThrottle, sendEvent, startHeartbeat, waitForAbort } from "../sse.js";
+import { createTrailingThrottle, startHeartbeat, waitForAbort } from "../sse.js";
+import { createSseSender } from "../sseSender.js";
 
 /** 单苦工详情节流：距上次发送不到这个间隔就等到满足间隔再发最新详情。 */
 const WORKER_DETAIL_THROTTLE_MS = 500;
@@ -24,7 +24,7 @@ function notFound(): never {
   throw new FleetError("not_found", "苦工不存在");
 }
 
-export function registerWorkersRoutes(app: HttpApp, { service, token }: HttpAppDeps): void {
+export function registerWorkersRoutes(app: HttpApp, { service, token, logger }: HttpAppDeps): void {
   // API_PATHS.worker(id) 等函数是给客户端拼具体请求地址用的（内部会 encodeURIComponent），
   // 不能拿来当 Hono 路由模式；这里在 API_PATHS.workers 常量后面手写 :id 占位符对应的后缀。
   // 路径字面量直接写在每个 app.get/post 调用里（而不是先存进变量），
@@ -82,54 +82,57 @@ export function registerWorkersRoutes(app: HttpApp, { service, token }: HttpAppD
     const query = parseOrThrow(timelineQuerySchema.safeParse(c.req.query()));
 
     return streamSSE(c, async (stream) => {
-      let lastSentSeq = query.after;
+      const sender = createSseSender(stream, { onDisconnect: (reason) => logger.warn(reason) });
+      let lastQueuedSeq = query.after;
+      let catchingUp = true;
+      let timelineChanged = false;
 
-      const sendTimelineBatch = async (events: TimelineEvent[]): Promise<void> => {
-        if (events.length === 0) {
-          return;
-        }
-        await sendEvent<TimelineStreamPayload>(stream, SSE_EVENTS.timeline, { events });
-        // events 按 seq 升序排列，取最后一条即可知道这一批发到哪了。
-        lastSentSeq = events[events.length - 1]?.seq ?? lastSentSeq;
+      const sendTimelineBatch = (events: TimelineEvent[]): Promise<boolean> => {
+        if (events.length === 0) return Promise.resolve(true);
+        // 已排队的事件也参与去重，避免前一批尚未写完时重复入队。
+        lastQueuedSeq = events.at(-1)?.seq ?? lastQueuedSeq;
+        return sender.send(SSE_EVENTS.timeline, { events });
       };
 
-      // 先发完整详情，再把历史事件按批发完。
-      await sendEvent(stream, SSE_EVENTS.worker, initialDetail);
-
-      let cursor = query.after;
-      for (;;) {
-        const page = await service.timeline(id, cursor, TIMELINE_HISTORY_BATCH_SIZE);
-        if (page === null || page.events.length === 0) {
-          break;
-        }
-        await sendTimelineBatch(page.events);
-        cursor = page.next;
-        if (page.events.length < TIMELINE_HISTORY_BATCH_SIZE) {
-          break;
-        }
-      }
-
-      // 历史发完之后再订阅，后续的时间线事件按 seq 去重转发，苦工详情变化节流后发送。
       const detailThrottle = createTrailingThrottle(WORKER_DETAIL_THROTTLE_MS, () => {
-        const latest = service.getWorker(id);
-        if (latest !== null) {
-          void sendEvent(stream, SSE_EVENTS.worker, latest);
-        }
+        sender.latest(SSE_EVENTS.worker, () => service.getWorker(id));
       });
-      const stopHeartbeat = startHeartbeat(stream);
+      const stopHeartbeat = startHeartbeat(sender);
       const unsubscribe = service.subscribe((event) => {
         if (event.type === "timeline" && event.workerId === id) {
-          const fresh = event.events.filter((item) => item.seq > lastSentSeq);
-          void sendTimelineBatch(fresh);
+          if (catchingUp) {
+            timelineChanged = true;
+          } else {
+            const fresh = event.events.filter((item) => item.seq > lastQueuedSeq);
+            void sendTimelineBatch(fresh);
+          }
         } else if (event.type === "worker" && event.workerId === id) {
           detailThrottle.trigger();
         }
       });
 
-      await waitForAbort(stream);
-      unsubscribe();
-      detailThrottle.dispose();
-      stopHeartbeat();
+      try {
+        if (!(await sender.send(SSE_EVENTS.worker, initialDetail))) return;
+
+        let cursor = query.after;
+        for (;;) {
+          timelineChanged = false;
+          const page = await service.timeline(id, cursor, TIMELINE_HISTORY_BATCH_SIZE);
+          if (stream.aborted || page === null) return;
+          if (page.events.length > 0) {
+            if (!(await sendTimelineBatch(page.events))) return;
+            cursor = page.next;
+          }
+          if (page.events.length < TIMELINE_HISTORY_BATCH_SIZE && !timelineChanged) break;
+        }
+        catchingUp = false;
+        await waitForAbort(stream);
+      } finally {
+        unsubscribe();
+        detailThrottle.dispose();
+        stopHeartbeat();
+        sender.dispose();
+      }
     });
   });
 }

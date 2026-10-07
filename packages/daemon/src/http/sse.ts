@@ -8,11 +8,11 @@ export const SSE_HEARTBEAT_MS = 15_000;
  * 返回值用于停止心跳，客户端断开时必须调用，否则定时器会一直占着。
  */
 export function startHeartbeat(
-  stream: SSEStreamingApi,
+  sender: { heartbeat(): void },
   intervalMs: number = SSE_HEARTBEAT_MS,
 ): () => void {
   const timer = setInterval(() => {
-    void stream.write(": ping\n\n");
+    sender.heartbeat();
   }, intervalMs);
   return () => clearInterval(timer);
 }
@@ -29,11 +29,6 @@ export function waitForAbort(stream: SSEStreamingApi): Promise<void> {
     }
     stream.onAbort(() => resolve());
   });
-}
-
-/** 发一条 JSON 格式的 SSE 具名事件。 */
-export async function sendEvent<T>(stream: SSEStreamingApi, event: string, data: T): Promise<void> {
-  await stream.writeSSE({ event, data: JSON.stringify(data) });
 }
 
 export interface Throttle {
